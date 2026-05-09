@@ -2072,13 +2072,6 @@ function YoutubeTrimEditor({
               />
               <button
                 type="button"
-                onClick={() => applyStart(readCurrentTime())}
-                title="Use the player's current time"
-              >
-                Use player
-              </button>
-              <button
-                type="button"
                 onClick={() => seekPlayer(startSeconds)}
                 title="Seek the preview player to this start time"
               >
@@ -2100,13 +2093,6 @@ function YoutubeTrimEditor({
                 spellCheck={false}
                 placeholder="00:00:00.000"
               />
-              <button
-                type="button"
-                onClick={() => applyEnd(readCurrentTime())}
-                title="Use the player's current time"
-              >
-                Use player
-              </button>
               <button
                 type="button"
                 onClick={() => seekPlayer(Math.max(0, endSeconds - 1))}

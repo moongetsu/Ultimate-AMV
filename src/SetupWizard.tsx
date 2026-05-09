@@ -1,9 +1,10 @@
 import React from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { AlertTriangle, CheckCircle2, Cpu, Loader2, Zap } from "lucide-react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { AlertTriangle, CheckCircle2, Cpu, FolderOpen, Loader2, Zap } from "lucide-react";
 
-type SetupStep = "hardware" | "recommend" | "install" | "complete";
+type SetupStep = "hardware" | "recommend" | "folder" | "install" | "complete";
 
 type HardwareInfo = {
   hasNvidiaGpu: boolean;
@@ -27,6 +28,7 @@ export function SetupWizard({ onComplete }: Props) {
   const [step, setStep] = React.useState<SetupStep>("hardware");
   const [hardware, setHardware] = React.useState<HardwareInfo | null>(null);
   const [selectedMode, setSelectedMode] = React.useState<"gpu" | "cpu">("cpu");
+  const [downloadPath, setDownloadPath] = React.useState("");
   const [installing, setInstalling] = React.useState(false);
   const [progress, setProgress] = React.useState<SetupProgress | null>(null);
   const [logLines, setLogLines] = React.useState<string[]>([]);
@@ -90,6 +92,14 @@ export function SetupWizard({ onComplete }: Props) {
     onComplete();
   }
 
+  async function chooseDownloadFolder() {
+    const selected = await openDialog({ directory: true, multiple: false });
+    if (selected && typeof selected === "string") {
+      setDownloadPath(selected);
+      await invoke("set_config", { key: "download_path", value: selected }).catch(() => {});
+    }
+  }
+
   function formatLine(p: SetupProgress): string {
     const parts: string[] = [];
     if (p.total > 0 && p.step > 0) parts.push(`[${Math.min(p.step, p.total)}/${p.total}]`);
@@ -98,9 +108,9 @@ export function SetupWizard({ onComplete }: Props) {
     return parts.join(" ");
   }
 
-  const steps: SetupStep[] = ["hardware", "recommend", "install", "complete"];
+  const steps: SetupStep[] = ["hardware", "recommend", "folder", "install", "complete"];
   const stepIndex = steps.indexOf(step);
-  const stepLabels = ["Hardware", "Engine", "Install", "Done"];
+  const stepLabels = ["Hardware", "Engine", "Folder", "Install", "Done"];
 
   return (
     <div className="setup-wizard">
@@ -197,6 +207,37 @@ export function SetupWizard({ onComplete }: Props) {
               <button type="button" className="setup-back-btn" onClick={() => setStep("hardware")}>
                 Back
               </button>
+              <button type="button" className="setup-next-btn" onClick={() => setStep("folder")}>
+                Continue
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === "folder" && (
+          <div className="setup-card">
+            <h2>Choose Save Folder</h2>
+            <p className="setup-desc">
+              Where Ultimate AMV will save downloaded anime episodes and YouTube clips. You can change this anytime in Settings.
+            </p>
+            <div className="setup-folder-row">
+              <FolderOpen size={18} />
+              <input
+                type="text"
+                className="setup-folder-input"
+                value={downloadPath}
+                placeholder="Default: Videos\Ultimate AMV\anime downloads"
+                readOnly
+                aria-label="Download folder path"
+              />
+              <button type="button" className="setup-folder-browse" onClick={chooseDownloadFolder}>
+                Browse
+              </button>
+            </div>
+            <div className="setup-nav">
+              <button type="button" className="setup-back-btn" onClick={() => setStep("recommend")}>
+                Back
+              </button>
               <button type="button" className="setup-next-btn" onClick={() => setStep("install")}>
                 Continue
               </button>
@@ -218,7 +259,7 @@ export function SetupWizard({ onComplete }: Props) {
                   <button
                     type="button"
                     className="setup-back-btn"
-                    onClick={() => setStep("recommend")}
+                    onClick={() => setStep("folder")}
                   >
                     Back
                   </button>
@@ -255,7 +296,7 @@ export function SetupWizard({ onComplete }: Props) {
                   <button
                     type="button"
                     className="setup-back-btn"
-                    onClick={() => setStep("recommend")}
+                    onClick={() => setStep("folder")}
                   >
                     Back
                   </button>

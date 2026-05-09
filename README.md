@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="app-logo.gif" alt="Ultimate AMV" width="100%">
+</p>
+
 # Ultimate AMV
 
 A Windows desktop app for building anime music video edits. It handles the full workflow in one place — browsing and downloading source footage, separating audio, extracting clips, and exporting the final cut.

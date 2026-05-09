@@ -73,28 +73,28 @@ jobs:
         run: npm run tauri build
 
       # ── Publish GitHub Release ─────────────────────────────────────────────
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          $changelog = Get-Content CHANGELOG.md -Raw
+          # Match "## [VERSION] — ..." up to the next "## [" header or the
+          # link reference block at the bottom (lines starting with "[X.Y.Z]:").
+          $pattern = "(?ms)^## \[$([regex]::Escape($version))\][^\n]*\n.*?(?=^## \[|^\[\d+\.\d+\.\d+\]:)"
+          $match = [regex]::Match($changelog, $pattern)
+          if (-not $match.Success) {
+            Write-Error "No CHANGELOG section found for $version. Add a '## [$version] — YYYY-MM-DD' block before tagging."
+            exit 1
+          }
+          $match.Value.TrimEnd() | Out-File -FilePath release-notes.md -Encoding utf8
+          Write-Host "::group::release-notes.md"
+          Get-Content release-notes.md
+          Write-Host "::endgroup::"
+
       - name: Upload installer to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             src-tauri/target/release/bundle/nsis/*.exe
-          body: |
-            Ultimate AMV is a Windows desktop app for building anime music video edits.
-
-            It covers the full workflow: browse and download source footage, separate audio into vocals and instrumentals, extract and trim clips, then export the final cut — all without leaving the app.
-
-            **What's included**
-            - Built-in browser with automatic media detection for anime streaming sites
-            - Audio separation powered by audio-separator, supporting both CPU and NVIDIA GPU (CUDA) modes
-            - Frame-accurate clip extraction and export via ffmpeg
-            - Download manager with yt-dlp integration for grabbing footage directly
-            - First-run setup wizard that installs all ML dependencies into a self-contained Python environment
-            - Customisable interface with preset themes and custom hex colour support
-
-            **Requirements**
-            - Windows 10 or later, 64-bit
-            - Around 4 GB of free disk space for the app and base ML dependencies
-            - GPU mode requires an NVIDIA GPU with up-to-date CUDA 12.x drivers
-
-            **Getting started**
-            Run the installer. On first launch, go to Settings and run the setup wizard to install the audio and clip processing backends. The wizard handles everything — no manual Python or dependency setup required.
+          body_path: release-notes.md

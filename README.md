@@ -2,6 +2,12 @@
 
 A Windows desktop app for building anime music video edits. It handles the full workflow in one place — browsing and downloading source footage, separating audio, extracting clips, and exporting the final cut.
 
+<p align="center">
+  <a href="https://discord.gg/kXqYrERSP">
+    <img src="https://img.shields.io/badge/Join%20our%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white&labelColor=4752C4" alt="Join our Discord" height="50">
+  </a>
+</p>
+
 ---
 
 ## Features

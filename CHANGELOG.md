@@ -5,6 +5,53 @@ All notable changes to Ultimate AMV are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-05-14
+
+### Added
+- **Unsupported-codec auto-convert for the GPU clip extractor.** Dropping a
+  video that uses a codec the GPU path can't decode (most commonly
+  ProRes / DNxHR / DNxHD inside `.mov`, or VP9 in unusual containers) now
+  surfaces a friendly modal instead of silently freezing. One click on
+  "Convert to compatible format" transcodes the source to H.264 mp4
+  (CRF 20, AAC audio) into a per-app cache directory, then re-runs the
+  extraction on the converted copy automatically. The original file is
+  never touched. A small "Using converted copy of <name>" badge appears
+  on the source card so the substitution is visible, and the cached copy
+  is keyed by source path + size + mtime so re-extracting the same file
+  is instant on subsequent runs.
+- **"Stuck? Convert to compatible format" escape hatch** under the
+  Cancel button during extraction, for the rare case a hang slips past
+  the preflight check. Kills the running job and opens the convert
+  modal pre-loaded with the active file.
+
+### Fixed
+- **GPU clip extraction no longer hangs forever on unsupported codecs.**
+  The clip extractor's GPU path calls `nelux.VideoReader(...,
+  decode_accelerator="nvdec")`, which only supports H.264 / HEVC / AV1
+  in hardware. On anything else (ProRes, DNxHR, VP9, exotic MKV
+  builds), nelux would hang inside native C++ code without ever raising
+  a Python exception or emitting an error event — leaving the UI stuck
+  at "Decoding at 8000+ FPS with Nelux Ultimate..." at 1% with no way
+  to recover short of killing the app. The frontend now runs a
+  ~50 ms ffprobe codec check before dispatching to the GPU path; if
+  the codec isn't in the supported whitelist (sourced from
+  `cuvid_decoder()` in `backend/clip_cli.py`), the convert modal opens
+  immediately with the codec named in plain language. CPU mode skips
+  this check entirely — PySceneDetect pipes through ffmpeg directly
+  and handles every codec ffmpeg knows.
+- **Cancel actually cancels GPU clip extractions now.** The previous
+  `cancel_clip` only killed the one-shot child process; the persistent
+  clip server (which runs nelux's native code) was a separate
+  AsyncChild that the cancel never touched, so a hung server would
+  stay hung and the next extraction would dispatch to the same wedged
+  stdin. Cancel now stops both — the one-shot PID and the persistent
+  `CLIP_SERVER` AsyncChild — and emits a synthetic `stopped` event so
+  the warmup automatically respawns a fresh server for the next run.
+  The Cancel button on the frontend also breaks out of the awaited
+  `clip-server-event` listener via an abort ref, which previously
+  waited indefinitely for a `done`/`error` event that never came after
+  a cancel.
+
 ## [0.4.1] — 2026-05-14
 
 ### Fixed
@@ -160,6 +207,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Self-contained first-run setup wizard that installs PyTorch, audio-
   separator, and ONNX Runtime into a bundled Python environment.
 
+[0.5.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.5.0
 [0.4.1]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.4.1
 [0.4.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.4.0
 [0.3.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.3.0

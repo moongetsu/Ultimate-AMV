@@ -1908,6 +1908,25 @@ button {
   color: var(--rose);
   border-color: rgba(255, 109, 145, 0.35);
 }
+.clip-convert-suggest {
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: rgba(160, 175, 188, 0.85);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: rgba(160, 175, 188, 0.25);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 140ms ease, text-decoration-color 140ms ease;
+}
+.clip-convert-suggest:hover {
+  color: rgb(var(--theme-accent-rgb));
+  text-decoration-color: rgb(var(--theme-accent-rgb) / 0.6);
+}
 
 .clip-extractor-stage {
   position: relative;
@@ -5856,6 +5875,52 @@ button {
   cursor: not-allowed;
   opacity: 0.55;
   box-shadow: none;
+}
+
+/* Clip extractor compatibility-convert modal — reuses .episode-label-* shell. */
+.clip-compat-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgb(var(--theme-accent-rgb) / 0.08);
+  border: 1px solid rgb(var(--theme-accent-rgb) / 0.2);
+  color: #eef3f8;
+  font-size: 13px;
+}
+.clip-compat-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.clip-compat-error-trace {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 160px;
+  overflow: auto;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #c7d0d8;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.clip-compat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgb(var(--theme-accent-rgb));
+  background: rgb(var(--theme-accent-rgb) / 0.12);
+  border: 1px solid rgb(var(--theme-accent-rgb) / 0.28);
 }
 
 /* Drag-and-drop zones — hover indicator while the OS is holding files

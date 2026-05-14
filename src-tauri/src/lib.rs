@@ -4719,6 +4719,255 @@ async fn clip_extract(window: tauri::Window, input_path: String, mode: String) -
     result
 }
 
+#[tauri::command]
+async fn clip_compat_convert(
+    window: tauri::Window,
+    input_path: String,
+) -> Result<String, String> {
+    log_info(
+        "clip.compat.start",
+        "Starting compatibility conversion",
+        json!({ "input": &input_path }),
+    );
+    let app_data_dir = window
+        .app_handle()
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Could not get app data directory: {error}"))?;
+
+    let log_input = input_path.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        run_clip_compat_convert(window, app_data_dir, input_path)
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    match &result {
+        Ok(payload) => log_info(
+            "clip.compat.complete",
+            "Compatibility conversion completed",
+            json!({ "input": log_input, "result": payload }),
+        ),
+        Err(error) => log_error(
+            "clip.compat.error",
+            "Compatibility conversion failed",
+            json!({ "input": log_input, "error": error }),
+        ),
+    }
+    result
+}
+
+fn run_clip_compat_convert(
+    window: tauri::Window,
+    app_data_dir: PathBuf,
+    input_path: String,
+) -> Result<String, String> {
+    let input = canonical_input_path(&input_path)?;
+    let metadata = input
+        .metadata()
+        .map_err(|error| format!("Could not read source metadata: {error}"))?;
+    let size_key = format!("{}", metadata.len());
+    let mtime_key = metadata
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| format!("{}", d.as_millis()))
+        .unwrap_or_default();
+    let path_key = input.to_string_lossy().to_string();
+    let cache_key = short_stable_id(&[
+        &path_key,
+        &size_key,
+        &mtime_key,
+        "compat-h264-mp4-v1",
+    ]);
+
+    let source_name = sanitize_path_segment(
+        input
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or("source"),
+        "source",
+        48,
+    )
+    .replace(' ', "_");
+
+    let cache_dir = app_data_dir.join("clip_compat_cache");
+    fs::create_dir_all(&cache_dir)
+        .map_err(|error| format!("Could not create compat cache folder: {error}"))?;
+
+    let output = cache_dir.join(format!("{source_name}-{cache_key}.mp4"));
+    if output
+        .metadata()
+        .map(|m| m.len() > 1024)
+        .unwrap_or(false)
+    {
+        log_info(
+            "clip.compat.cache_hit",
+            "Reusing cached compatible copy",
+            json!({ "input": &path_key, "output": output.to_string_lossy() }),
+        );
+        let _ = window.emit(
+            "clip-progress",
+            json!({
+                "type": "progress",
+                "stage": "complete",
+                "percent": 100,
+                "message": "Using cached compatible copy",
+            }),
+        );
+        return Ok(json!({
+            "type": "done",
+            "output": output.to_string_lossy().to_string(),
+            "cached": true,
+        })
+        .to_string());
+    }
+
+    let root = app_root()?;
+    let ffmpeg = find_tool(&root, "ffmpeg");
+    let ffprobe = find_tool(&root, "ffprobe");
+    ensure_tool(&ffmpeg)?;
+    ensure_tool(&ffprobe)?;
+
+    let duration_seconds = probe_duration_seconds(&ffprobe, &input).unwrap_or(0.0);
+
+    let temp_output = output.with_extension("converting.mp4");
+    let _ = fs::remove_file(&temp_output);
+
+    let _ = window.emit(
+        "clip-progress",
+        json!({
+            "type": "progress",
+            "stage": "starting",
+            "percent": 0,
+            "message": "Converting to compatible format...",
+        }),
+    );
+
+    let mut child = cmd(&ffmpeg)
+        .arg("-hide_banner")
+        .arg("-loglevel").arg("error")
+        .arg("-y")
+        .arg("-i").arg(&input)
+        .arg("-map").arg("0:v:0")
+        .arg("-map").arg("0:a:0?")
+        .arg("-c:v").arg("libx264")
+        .arg("-preset").arg("veryfast")
+        .arg("-crf").arg("20")
+        .arg("-pix_fmt").arg("yuv420p")
+        .arg("-c:a").arg("aac")
+        .arg("-b:a").arg("192k")
+        .arg("-movflags").arg("+faststart")
+        .arg("-progress").arg("pipe:1")
+        .arg("-nostats")
+        .arg(&temp_output)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("Could not start ffmpeg: {error}"))?;
+
+    let stdout = child.stdout.take();
+    let progress_handle = stdout.map(|stdout| {
+        let window_clone = window.clone();
+        let total = duration_seconds;
+        thread::spawn(move || {
+            let reader = BufReader::new(stdout);
+            for line in reader.lines().map_while(Result::ok) {
+                if let Some(rest) = line.strip_prefix("out_time_ms=") {
+                    if let Ok(us) = rest.trim().parse::<u64>() {
+                        let secs = us as f64 / 1_000_000.0;
+                        let percent = if total > 0.0 {
+                            (secs / total * 100.0).clamp(0.0, 99.0)
+                        } else {
+                            0.0
+                        };
+                        let message = if total > 0.0 {
+                            format!("Converting... {percent:.0}%")
+                        } else {
+                            "Converting to compatible format...".to_string()
+                        };
+                        let _ = window_clone.emit(
+                            "clip-progress",
+                            json!({
+                                "type": "progress",
+                                "stage": "decode",
+                                "percent": percent,
+                                "message": message,
+                            }),
+                        );
+                    }
+                }
+            }
+        })
+    });
+
+    let stderr = child.stderr.take();
+    let stderr_handle = stderr.map(|mut stderr| {
+        thread::spawn(move || {
+            use std::io::Read;
+            let mut buf = String::new();
+            let _ = stderr.read_to_string(&mut buf);
+            buf
+        })
+    });
+
+    let status = child
+        .wait()
+        .map_err(|error| format!("ffmpeg wait failed: {error}"))?;
+    let _ = progress_handle.map(|h| h.join());
+    let stderr_text = stderr_handle
+        .and_then(|h| h.join().ok())
+        .unwrap_or_default();
+
+    if !status.success() {
+        let _ = fs::remove_file(&temp_output);
+        let trimmed = stderr_text.trim();
+        let message = if trimmed.is_empty() {
+            "Could not convert this file. The source may be corrupted or use a codec ffmpeg can't decode.".to_string()
+        } else {
+            format!(
+                "Could not convert this file to a compatible format.\n\n{}",
+                trimmed
+            )
+        };
+        return Err(message);
+    }
+
+    fs::rename(&temp_output, &output)
+        .map_err(|error| format!("Could not finalize converted file: {error}"))?;
+
+    let _ = window.emit(
+        "clip-progress",
+        json!({
+            "type": "progress",
+            "stage": "complete",
+            "percent": 100,
+            "message": "Conversion complete",
+        }),
+    );
+
+    Ok(json!({
+        "type": "done",
+        "output": output.to_string_lossy().to_string(),
+        "cached": false,
+    })
+    .to_string())
+}
+
+fn probe_duration_seconds(ffprobe: &Path, input: &Path) -> Option<f64> {
+    let output = cmd(ffprobe)
+        .arg("-v").arg("error")
+        .arg("-show_entries").arg("format=duration")
+        .arg("-of").arg("default=nokey=1:noprint_wrappers=1")
+        .arg(input)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    text.trim().parse::<f64>().ok()
+}
+
 fn run_streaming_audio_cli(
     window: tauri::Window,
     args: Vec<String>,
@@ -4976,9 +5225,38 @@ fn cancel_audio() {
 }
 
 #[tauri::command]
-fn cancel_clip() {
+async fn cancel_clip(window: tauri::Window) {
     log_warn("clip.cancel", "Cancelling active clip process", Value::Null);
     kill_child_pid(&CLIP_CHILD_PID);
+
+    // The persistent clip server runs nelux/torchcodec native code that can
+    // hang in C++ on unsupported codecs without ever raising. The one-shot
+    // PID kill above doesn't touch this child — we must stop it explicitly
+    // so the next extraction starts on a fresh process instead of writing
+    // to a stuck stdin.
+    if let Some(mutex) = CLIP_SERVER.get() {
+        let mut guard = mutex.lock().await;
+        if let Some(mut child) = guard.take() {
+            log_info("clip.server.kill", "Stopping clip server on cancel", Value::Null);
+            let _ = window.emit(
+                "clip-server-event",
+                json!({ "type": "stopped", "reason": "cancel" }),
+            );
+            if let Err(error) = child.start_kill() {
+                log_warn(
+                    "clip.server.kill.warning",
+                    "Could not request clip server stop on cancel",
+                    json!({ "error": error.to_string() }),
+                );
+            } else {
+                let _ = tokio::time::timeout(
+                    std::time::Duration::from_secs(3),
+                    child.wait(),
+                )
+                .await;
+            }
+        }
+    }
 }
 
 #[tauri::command]
@@ -5127,6 +5405,7 @@ pub fn run() {
             save_background_image,
             clear_background_image,
             clip_extract,
+            clip_compat_convert,
             warmup_clip_server,
             install_media_sniffer,
             download_stream,

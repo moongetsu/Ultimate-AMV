@@ -32,6 +32,7 @@ import type {
   ClipScene,
 } from "../../types/clip";
 import type { ConversionDone, VideoGpuStatus } from "../../types/conversion";
+import { ClipCompatConvertModal } from "./ClipCompatConvertModal";
 import { ClipPreviewScroller } from "./ClipPreviewScroller";
 import { ClipPreviewTile } from "./ClipPreviewTile";
 
@@ -58,6 +59,15 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   const [isExtracting, setIsExtracting] = React.useState(false);
   const [serverStatus, setServerStatus] = React.useState<"cold" | "warming" | "ready">("cold");
   const [gpuStatus, setGpuStatus] = React.useState<VideoGpuStatus | null>(null);
+  const [compatModal, setCompatModal] = React.useState<{
+    failedPath: string;
+    failedIndex: number;
+    rawError: string;
+  } | null>(null);
+  const [isConverting, setIsConverting] = React.useState(false);
+  const [convertMessage, setConvertMessage] = React.useState<string | null>(null);
+  // Maps a converted cache path -> the original filename it replaced (for the badge).
+  const [convertedSources, setConvertedSources] = React.useState<Record<string, string>>({});
   const [clipModeLoaded, setClipModeLoaded] = React.useState(false);
   const [activationEpoch, setActivationEpoch] = React.useState(0);
   const wasActiveRef = React.useRef(active);
@@ -193,6 +203,8 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     setProgress(null);
     setError(null);
     setMergeMode(false);
+    setCompatModal(null);
+    setConvertedSources({});
 
     // Video picked, high intent to extract - warm up the server
     if (clipMode !== "cpu") {
@@ -255,6 +267,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   const selectedCount = selectedClipIds.size;
   const canExtract = selectedVideos.length > 0 && !isExtracting;
   const clipCancellingRef = React.useRef(false);
+  const clipAbortRef = React.useRef<((reason: Error) => void) | null>(null);
   const readyPreviewCount = React.useMemo(
     () => clips.reduce((count, clip) => count + (clip.previewState?.status === "ready" ? 1 : 0), 0),
     [clips],
@@ -425,8 +438,27 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     }
   }, [activeGridClipIds, clipMode, clips, gridPreview, hasClips, previewStates]);
 
-  async function startExtraction() {
-    if (selectedVideos.length === 0 || isExtracting) return;
+  async function startExtraction(overrideVideos?: string[]) {
+    const videos = overrideVideos ?? selectedVideos;
+    if (videos.length === 0 || isExtracting) return;
+
+    // Preflight codec check — only the GPU path is codec-fragile. nelux+NVDEC
+    // can hang in native code on anything outside the supported set; CPU mode
+    // goes through ffmpeg directly and handles every codec ffmpeg knows.
+    if (clipMode === "gpu") {
+      const unsupported = await findFirstUnsupportedGpuCodec(videos);
+      if (unsupported) {
+        setCompatModal({
+          failedPath: unsupported.path,
+          failedIndex: unsupported.index,
+          rawError: unsupported.codec === "unknown"
+            ? `Couldn't read this file's metadata — it may be corrupted or use an exotic container. Convert it to a compatible format to try again.`
+            : `Codec "${unsupported.codec}" isn't supported by the GPU clip extractor. Only H.264, HEVC, and AV1 work directly on the GPU path. Convert to a compatible format, or switch the clip extractor to CPU mode in Settings.`,
+        });
+        return;
+      }
+    }
+
     setIsExtracting(true);
     setResult(null);
     setPreviewStates({});
@@ -434,6 +466,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     previewInFlightRef.current.clear();
     previewBatchInFlightRef.current = 0;
     setError(null);
+    setCompatModal(null);
     setSelectedClipIds(new Set());
     setMergeOrder([]);
     setMergeMode(false);
@@ -441,8 +474,8 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
       type: "progress",
       stage: "starting",
       percent: 0,
-      message: selectedVideos.length > 1
-        ? `Starting ${selectedVideos.length} episode batch...`
+      message: videos.length > 1
+        ? `Starting ${videos.length} episode batch...`
         : clipMode === "gpu" ? "Starting RTX TransNetV2 extraction..." : "Starting PySceneDetect CPU extraction...",
     });
 
@@ -464,31 +497,31 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
       }
 
       const results: ClipExtractionResult[] = [];
-      for (let index = 0; index < selectedVideos.length; index += 1) {
+      for (let index = 0; index < videos.length; index += 1) {
         if (clipCancellingRef.current) break;
-        const inputPath = selectedVideos[index];
+        const inputPath = videos[index];
         clipBatchProgressRef.current = {
           activeIndex: index,
-          total: selectedVideos.length,
+          total: videos.length,
           inputPath,
         };
         setProgress({
           type: "progress",
           stage: "starting",
-          percent: Math.round((index / selectedVideos.length) * 100),
-          message: `Episode ${index + 1}/${selectedVideos.length}: ${fileName(inputPath)}`,
+          percent: Math.round((index / videos.length) * 100),
+          message: `Episode ${index + 1}/${videos.length}: ${fileName(inputPath)}`,
         });
         const raw = await invoke<string>("clip_extract", { inputPath, mode: clipMode });
         const payload = raw.includes("server_task_started")
-          ? await waitForClipServerResult()
+          ? await waitForClipServerResult(clipAbortRef)
           : parseBridgePayload<ClipExtractionResult>(raw);
         results.push(payload);
         setResult(combineClipResults(results, clipMode));
         setProgress({
           type: "progress",
           stage: "complete",
-          percent: Math.round(((index + 1) / selectedVideos.length) * 100),
-          message: `Episode ${index + 1}/${selectedVideos.length} complete: ${fileName(inputPath)}`,
+          percent: Math.round(((index + 1) / videos.length) * 100),
+          message: `Episode ${index + 1}/${videos.length} complete: ${fileName(inputPath)}`,
           elapsedSeconds: results.reduce((total, item) => total + (item.totalSeconds || 0), 0),
         });
       }
@@ -505,14 +538,95 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
       });
     } catch (clipError) {
       if (!clipCancellingRef.current) {
-        setError(readBridgeError(clipError));
+        const errorText = readBridgeError(clipError);
+        setError(errorText);
+        const failed = clipBatchProgressRef.current;
+        const failedPath = failed?.inputPath ?? videos[0];
+        const failedIndex = failed?.activeIndex ?? 0;
+        if (failedPath) {
+          setCompatModal({ failedPath, failedIndex, rawError: errorText });
+        }
       }
     } finally {
+      clipAbortRef.current = null;
       clipBatchProgressRef.current = null;
       clipCancellingRef.current = false;
       setIsExtracting(false);
     }
   }
+
+  async function handleConvertCompat() {
+    if (!compatModal || isConverting) return;
+    const { failedPath, failedIndex } = compatModal;
+    setIsConverting(true);
+    setConvertMessage("Converting to compatible format...");
+    setError(null);
+    setProgress({
+      type: "progress",
+      stage: "starting",
+      percent: 0,
+      message: `Converting ${fileName(failedPath)} to compatible format...`,
+    });
+    try {
+      const raw = await invoke<string>("clip_compat_convert", { inputPath: failedPath });
+      const payload = parseBridgePayload<{ output: string; cached: boolean }>(raw);
+      const convertedPath = payload.output;
+      const originalName = fileName(failedPath);
+      setConvertedSources((current) => ({ ...current, [convertedPath]: originalName }));
+      const nextVideos = [...selectedVideos];
+      if (nextVideos[failedIndex] === failedPath) {
+        nextVideos[failedIndex] = convertedPath;
+      } else {
+        const swapIndex = nextVideos.indexOf(failedPath);
+        if (swapIndex >= 0) nextVideos[swapIndex] = convertedPath;
+      }
+      setSelectedVideos(nextVideos);
+      setCompatModal(null);
+      setConvertMessage(null);
+      setIsConverting(false);
+      void startExtraction(nextVideos);
+    } catch (convertError) {
+      const errorText = readBridgeError(convertError);
+      setError(errorText);
+      setProgress(null);
+      setConvertMessage(null);
+      setIsConverting(false);
+      setCompatModal((current) =>
+        current ? { ...current, rawError: errorText } : current,
+      );
+      logFrontend("error", "frontend.clip.compat.error", "Compatibility conversion failed", {
+        error: safeLogValue(convertError),
+      });
+    }
+  }
+
+  function dismissCompatModal() {
+    if (isConverting) return;
+    setCompatModal(null);
+  }
+
+  function openCompatModalForCurrent() {
+    const active = clipBatchProgressRef.current;
+    const failedPath = active?.inputPath ?? selectedVideos[0];
+    const failedIndex = active?.activeIndex ?? 0;
+    if (!failedPath) return;
+    setCompatModal({
+      failedPath,
+      failedIndex,
+      rawError: "Extraction was running too long. The source may use a codec the extractor can't read.",
+    });
+    clipCancellingRef.current = true;
+    void invoke("cancel_clip");
+    clipAbortRef.current?.(new Error("USER_REQUESTED_CONVERT"));
+    clipAbortRef.current = null;
+  }
+
+  const convertedBadgeNames = React.useMemo(
+    () => selectedVideos
+      .map((path) => convertedSources[path])
+      .filter((name): name is string => Boolean(name)),
+    [selectedVideos, convertedSources],
+  );
 
   function toggleClipSelection(clipId: string) {
     setSelectedClipIds((current) => {
@@ -732,6 +846,13 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
             <span>{selectedVideos.length === 1 ? selectedVideos[0] : selectedVideos.map(fileName).join(" / ")}</span>
           )}
           <em>{clipMode === "gpu" ? "GPU mode · RTX TransNetV2" : "CPU mode · PySceneDetect"}</em>
+          {convertedBadgeNames.length > 0 && (
+            <span className="clip-compat-badge" title="The clip extractor is reading a converted copy stored in the app's cache. The original file is untouched.">
+              {convertedBadgeNames.length === 1
+                ? `Using converted copy of ${convertedBadgeNames[0]}`
+                : `Using converted copies for ${convertedBadgeNames.length} files`}
+            </span>
+          )}
         </div>
 
         <div className="clip-tool-stack" aria-label="Clip extractor actions">
@@ -863,7 +984,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
           <span>ProRes and Intra frame formats are best for After Effects responsiveness.</span>
         </div>
 
-        <button type="button" className="clip-primary-action" disabled={!canExtract} onClick={startExtraction}>
+        <button type="button" className="clip-primary-action" disabled={!canExtract} onClick={() => void startExtraction()}>
           {isExtracting ? "Extracting..." : hasClips ? "Extract again" : "Extract clips"}
         </button>
         {isExtracting && (
@@ -873,10 +994,22 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
             onClick={() => {
               clipCancellingRef.current = true;
               void invoke("cancel_clip");
+              clipAbortRef.current?.(new Error("USER_CANCELLED"));
+              clipAbortRef.current = null;
             }}
           >
             <X size={14} strokeWidth={2.3} />
             Cancel
+          </button>
+        )}
+        {isExtracting && !isConverting && (
+          <button
+            type="button"
+            className="clip-convert-suggest"
+            onClick={() => openCompatModalForCurrent()}
+            title="If this is taking too long, the source may use a codec the extractor can't read. Convert it to a compatible format."
+          >
+            Stuck? Convert to compatible format
           </button>
         )}
       </div>
@@ -945,6 +1078,16 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
           </div>
         )}
 
+        <ClipCompatConvertModal
+          open={Boolean(compatModal)}
+          failedPath={compatModal?.failedPath ?? null}
+          rawError={compatModal?.rawError ?? null}
+          isConverting={isConverting}
+          convertMessage={isConverting ? (progress?.message ?? convertMessage) : convertMessage}
+          onConvert={() => void handleConvertCompat()}
+          onCancel={dismissCompatModal}
+        />
+
         {mergeMode && (
           <div className={`merge-strip ${mergeOrderedClips.length > 0 ? "is-active" : "is-empty"}`} aria-live="polite">
             <div className="merge-strip-header">
@@ -992,16 +1135,53 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   );
 }
 
-async function waitForClipServerResult(): Promise<ClipExtractionResult> {
+// nelux+NVDEC reliably decodes only these codecs. Anything else either errors
+// out or hangs in native code without raising — so we refuse the GPU path
+// upfront and prompt the user to convert. Keep this list in sync with
+// cuvid_decoder() in backend/clip_cli.py.
+const GPU_SUPPORTED_CODECS = new Set(["h264", "hevc", "av1"]);
+
+async function findFirstUnsupportedGpuCodec(
+  videos: string[],
+): Promise<{ path: string; index: number; codec: string } | null> {
+  for (let index = 0; index < videos.length; index += 1) {
+    const path = videos[index];
+    let codec = "unknown";
+    try {
+      const raw = await invoke<string>("video_source_codec", { inputPath: path });
+      codec = raw.trim().toLowerCase();
+    } catch (probeError) {
+      logFrontend("warn", "frontend.clip.codec_probe.warning", "Could not probe codec; treating as unsupported", {
+        path,
+        error: safeLogValue(probeError),
+      });
+      return { path, index, codec: "unknown" };
+    }
+    if (!GPU_SUPPORTED_CODECS.has(codec)) {
+      return { path, index, codec };
+    }
+  }
+  return null;
+}
+
+async function waitForClipServerResult(
+  abortRef: React.MutableRefObject<((reason: Error) => void) | null>,
+): Promise<ClipExtractionResult> {
   return new Promise((resolve, reject) => {
     let unlisten: (() => void) | null = null;
+    abortRef.current = (reason) => {
+      unlisten?.();
+      reject(reason);
+    };
     void listen<any>("clip-server-event", (event) => {
       const payload = event.payload;
       if (payload.type === "done") {
         unlisten?.();
+        abortRef.current = null;
         resolve(payload as ClipExtractionResult);
       } else if (payload.type === "error") {
         unlisten?.();
+        abortRef.current = null;
         reject(new Error(payload.message ?? "Clip extraction failed."));
       }
     }).then((cleanup) => {

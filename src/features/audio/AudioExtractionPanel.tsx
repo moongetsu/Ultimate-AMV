@@ -2,7 +2,7 @@ import React from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { CheckCircle2, History, Upload } from "lucide-react";
+import { CheckCircle2, Upload } from "lucide-react";
 import { logFrontend, safeLogValue } from "../../lib/log";
 import { fileName, normalizeSelectedPaths } from "../../lib/paths";
 import { extensionAccept, useFileDrop } from "../../lib/useFileDrop";
@@ -11,11 +11,9 @@ import { parseBridgePayload, readBridgeError } from "../../utils/bridge";
 const AUDIO_INPUT_EXTENSIONS = ["wav", "mp3", "flac", "m4a", "mp4", "mkv", "avi", "webm", "mov"];
 const audioInputAccept = extensionAccept(AUDIO_INPUT_EXTENSIONS);
 import type {
-  AudioHistoryItem,
   AudioProgress,
   AudioSetupProgress,
   AudioStatus,
-  AudioTab,
   BatchItemStatus,
 } from "../../types/audio";
 import { BatchStatusList } from "./BatchStatusList";
@@ -28,9 +26,8 @@ import { SetupRunningCard } from "./SetupRunningCard";
 let cachedAudioStatus: AudioStatus | null = null;
 let pendingAudioStatus: Promise<AudioStatus> | null = null;
 
-export function AudioExtractionPanel({ activeTab }: { activeTab: AudioTab }) {
+export function AudioExtractionPanel() {
   const [status, setStatus] = React.useState<AudioStatus | null>(cachedAudioStatus);
-  const [history, setHistory] = React.useState<AudioHistoryItem[]>([]);
   const [selectedFiles, setSelectedFiles] = React.useState<string[]>([]);
   const [progress, setProgress] = React.useState<AudioProgress | null>(null);
   const [extracting, setExtracting] = React.useState(false);
@@ -45,7 +42,6 @@ export function AudioExtractionPanel({ activeTab }: { activeTab: AudioTab }) {
 
   React.useEffect(() => {
     void refreshStatus();
-    void refreshHistory();
   }, []);
 
   React.useEffect(() => {
@@ -96,19 +92,6 @@ export function AudioExtractionPanel({ activeTab }: { activeTab: AudioTab }) {
       if (!request || pendingAudioStatus === request) {
         pendingAudioStatus = null;
       }
-    }
-  }
-
-  async function refreshHistory() {
-    try {
-      const raw = await invoke<string>("audio_history");
-      const payload = parseBridgePayload<{ type: "history"; items: AudioHistoryItem[] }>(raw);
-      setHistory(payload.items ?? []);
-    } catch (error) {
-      console.error("Could not load audio history:", error);
-      logFrontend("error", "frontend.audio.history.error", "Could not load audio history", {
-        error: safeLogValue(error),
-      });
     }
   }
 
@@ -168,7 +151,6 @@ export function AudioExtractionPanel({ activeTab }: { activeTab: AudioTab }) {
       setOutputPaths(allOutputs);
       const failures = completed.filter((item) => item.status === "error").length;
       setResultMessage(`${completed.length - failures}/${filePaths.length} files extracted. ${allOutputs.length} stems saved.`);
-      await refreshHistory();
       await refreshStatus(true);
     } catch (error) {
       if (!audioCancellingRef.current) {
@@ -210,29 +192,6 @@ export function AudioExtractionPanel({ activeTab }: { activeTab: AudioTab }) {
       setSetupRunning(null);
       setSetupProgress(null);
     }
-  }
-
-  if (activeTab === "history") {
-    return (
-      <div className="audio-history">
-        {history.length === 0 ? (
-          <div className="audio-empty">
-            <History size={32} strokeWidth={1.8} />
-            <h2>No extractions yet</h2>
-          </div>
-        ) : (
-          history.map((item) => (
-            <article className="history-row" key={`${item.created_at}-${item.input}`}>
-              <div>
-                <strong>{fileName(item.input)}</strong>
-                <span>{item.created_at}</span>
-              </div>
-              <p>{item.outputs.map(fileName).join("  /  ")}</p>
-            </article>
-          ))
-        )}
-      </div>
-    );
   }
 
   const depsReady = status?.dependencies.ready ?? true;

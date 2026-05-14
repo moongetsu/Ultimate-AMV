@@ -59,6 +59,14 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   const [serverStatus, setServerStatus] = React.useState<"cold" | "warming" | "ready">("cold");
   const [gpuStatus, setGpuStatus] = React.useState<VideoGpuStatus | null>(null);
   const [clipModeLoaded, setClipModeLoaded] = React.useState(false);
+  const [activationEpoch, setActivationEpoch] = React.useState(0);
+  const wasActiveRef = React.useRef(active);
+  React.useEffect(() => {
+    if (active && !wasActiveRef.current) {
+      setActivationEpoch((value) => value + 1);
+    }
+    wasActiveRef.current = active;
+  }, [active]);
   const previewStatesRef = React.useRef(previewStates);
   const previewInFlightRef = React.useRef<Set<string>>(new Set());
   const previewBatchInFlightRef = React.useRef(0);
@@ -897,6 +905,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
                     paused={!gridPreview}
                     playable={activeGridClipIds.has(clip.id)}
                     selected={mergeMode ? mergePositions.has(clip.id) : selectedClipIds.has(clip.id)}
+                    activationEpoch={activationEpoch}
                     onClick={() => handleClipClick(clip)}
                     onToggleSelect={() =>
                       mergeMode ? toggleMergeOrder(clip.id) : toggleClipSelection(clip.id)

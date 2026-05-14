@@ -34,6 +34,7 @@ export function ClipPreviewTile({
   mergePosition,
   paused,
   playable,
+  activationEpoch,
   onClick,
   onToggleSelect,
 }: {
@@ -43,6 +44,7 @@ export function ClipPreviewTile({
   mergePosition: number | null;
   paused: boolean;
   playable: boolean;
+  activationEpoch: number;
   onClick: () => void;
   onToggleSelect: () => void;
 }) {
@@ -56,7 +58,7 @@ export function ClipPreviewTile({
 
   React.useEffect(() => {
     setIsReady(false);
-  }, [previewRange?.src]);
+  }, [previewRange?.src, activationEpoch]);
 
   return (
     <div className={`clip-preview-tile-wrapper ${selected ? "is-selected" : ""}`}>
@@ -68,7 +70,9 @@ export function ClipPreviewTile({
         {shouldPlay && previewRange ? (
           <>
             <img
-              src={previewRange.src}
+              key={`${previewRange.id}-${activationEpoch}`}
+              // Cache-bust on activation: Chromium otherwise serves the WebP from its decoded image cache and the animation stays mid-cycle, desynced from the bar.
+              src={`${previewRange.src}?v=${activationEpoch}`}
               alt=""
               className={isReady ? "is-ready" : "is-loading"}
               onLoad={() => setIsReady(true)}
@@ -85,7 +89,7 @@ export function ClipPreviewTile({
             style={{ "--clip-loop-duration": `${loopDuration}s` } as React.CSSProperties}
             aria-hidden="true"
           >
-            <span key={previewRange.id} />
+            <span key={`${previewRange.id}-${activationEpoch}`} />
           </span>
         )}
         <span className="clip-tile-scrim" />

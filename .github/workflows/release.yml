@@ -65,6 +65,45 @@ jobs:
           Copy-Item $bin2.FullName -Destination "tools\ffprobe.exe"
           Remove-Item $zip, $tmp -Recurse -Force
 
+      - name: Download FFmpeg shared DLLs (for nelux clip extractor)
+        shell: pwsh
+        run: |
+          # nelux's C extension loads libavcodec / libavformat / etc. via
+          # Windows DLL search at import time. clip_cli.py registers
+          # tools\ffmpeg-shared\ with os.add_dll_directory, so the shared-
+          # build FFmpeg DLLs must live there in the installer bundle. The
+          # static ffmpeg.exe step above does NOT provide these — it's a
+          # single fat binary with everything statically linked, so it
+          # works for the bundled tools but cannot satisfy nelux.
+          #
+          # Pinned to the n8.1 branch because nelux's current wheel is
+          # built against libavcodec.so.62 (the major in FFmpeg 8.x — 8.0
+          # shipped 62.x, 8.1 stays 62.x, ABI-compatible). If BtbN ever
+          # stops publishing n8.1 shared builds — or nelux's wheel jumps
+          # to a newer avcodec major (likely libavcodec.so.63 with the
+          # FFmpeg 9.0 cut) — update this URL accordingly. Master builds
+          # would NOT work today because master is already FFmpeg 9-pre
+          # and ships avcodec-63.dll.
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-gpl-shared-8.1.zip"
+          $zip = "$env:TEMP\ffmpeg-shared.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          $tmp = "$env:TEMP\ffmpeg-shared-extract"
+          Expand-Archive -Path $zip -DestinationPath $tmp -Force
+          New-Item -ItemType Directory -Force -Path "tools\ffmpeg-shared" | Out-Null
+          # BtbN's shared zip puts DLLs in <root>\bin\; we want the DLLs
+          # flat under tools\ffmpeg-shared\ (matching clip_cli.py's path).
+          Get-ChildItem -Path $tmp -Recurse -Filter "*.dll" |
+            Where-Object { $_.FullName -like '*\bin\*' } |
+            ForEach-Object { Copy-Item $_.FullName -Destination "tools\ffmpeg-shared\$($_.Name)" }
+          $copied = Get-ChildItem -Path "tools\ffmpeg-shared" -Filter "*.dll"
+          if ($copied.Count -eq 0) {
+            Write-Error "No DLLs were copied into tools\ffmpeg-shared\. BtbN may have changed the zip layout — inspect $tmp and update this step."
+            exit 1
+          }
+          Write-Host "Staged $($copied.Count) FFmpeg shared DLLs for nelux:"
+          $copied | ForEach-Object { Write-Host "  $($_.Name)" }
+          Remove-Item $zip, $tmp -Recurse -Force
+
       # ── Frontend + Tauri build ─────────────────────────────────────────────
       - name: Install npm dependencies
         run: npm ci

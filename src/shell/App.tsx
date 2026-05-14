@@ -18,7 +18,6 @@ import { logFrontend, safeLogValue } from "../lib/log";
 import { applyAppTheme, isHexColor, readThemeColors } from "../lib/theme";
 import { parseBridgePayload } from "../utils/bridge";
 import type { AppConfig, BackgroundState, NavItem, SectionId } from "../types/app";
-import type { AudioTab } from "../types/audio";
 import type { DownloaderTab } from "../types/download";
 import { AudioExtractionPanel } from "../features/audio/AudioExtractionPanel";
 import { MediaToAudioPanel } from "../features/audio/MediaToAudioPanel";
@@ -81,7 +80,6 @@ const panelMeta: Record<SectionId, { kicker: string; title: string; stats: strin
 export function App() {
   const [expanded, setExpanded] = React.useState(true);
   const [active, setActive] = React.useState<SectionId>("clip-hunting");
-  const [audioTab, setAudioTab] = React.useState<AudioTab>("extract");
   const [downloaderTab, setDownloaderTab] = React.useState<DownloaderTab>("anime");
   const [bgState, setBgState] = React.useState<BackgroundState>(DEFAULT_BG_STATE);
   const [bgPreview, setBgPreview] = React.useState<BackgroundState | null>(null);
@@ -131,10 +129,7 @@ export function App() {
   }, []);
 
   const modeTabs = isAudioExtraction
-    ? ([
-      { id: "extract", label: "Extract" },
-      { id: "history", label: "History" },
-    ] as const)
+    ? ([{ id: "extract", label: "Extract" }] as const)
     : isLogs
       ? ([{ id: "logs", label: "Logs" }] as const)
       : isSettings
@@ -237,9 +232,7 @@ export function App() {
                     key={tab.id}
                     type="button"
                     className={`mode-tab ${isAudioExtraction
-                        ? audioTab === tab.id
-                          ? "is-active"
-                          : ""
+                        ? "is-active"
                         : isDownloader
                           ? downloaderTab === tab.id
                             ? "is-active"
@@ -253,9 +246,6 @@ export function App() {
                               : ""
                       }`}
                     onClick={() => {
-                      if (isAudioExtraction && (tab.id === "extract" || tab.id === "history")) {
-                        setAudioTab(tab.id);
-                      }
                       if (isDownloader && (tab.id === "anime" || tab.id === "youtube")) {
                         setDownloaderTab(tab.id);
                       }
@@ -273,7 +263,7 @@ export function App() {
                   <DownloaderPanel active={isDownloader} activeTab={downloaderTab} sidebarExpanded={expanded} />
                 </div>
                 <div className={`panel-view ${isAudioExtraction ? "is-active" : "is-hidden"}`} aria-hidden={!isAudioExtraction}>
-                  <AudioExtractionPanel activeTab={audioTab} />
+                  <AudioExtractionPanel />
                 </div>
                 {!isClipHunting && !isDownloader && !isAudioExtraction && (
                   <div className="panel-view is-active">

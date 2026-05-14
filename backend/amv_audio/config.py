@@ -2,7 +2,6 @@ import copy
 import json
 import logging
 import os
-from datetime import datetime
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -22,7 +21,6 @@ def _default_state_dir():
 
 STATE_DIR = Path(os.environ.get("ULTIMATE_AMV_STATE_DIR") or _default_state_dir())
 CONFIG_FILE = STATE_DIR / "config.json"
-HISTORY_FILE = STATE_DIR / "audio_history.json"
 
 DEFAULT_CONFIG = {
     "recent_files": [],
@@ -75,22 +73,3 @@ def add_recent_file(path):
     save_config(config)
 
 
-def get_history():
-    if not HISTORY_FILE.exists():
-        return []
-    try:
-        history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
-        return history if isinstance(history, list) else []
-    except (json.JSONDecodeError, OSError):
-        return []
-
-
-def add_history(record):
-    history = get_history()
-    record = {
-        "created_at": datetime.now().isoformat(timespec="seconds"),
-        **record,
-    }
-    history.insert(0, record)
-    HISTORY_FILE.write_text(json.dumps(history[:100], indent=2), encoding="utf-8")
-    return record

@@ -5,6 +5,77 @@ All notable changes to Ultimate AMV are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-05-14
+
+### Fixed
+- **Updates no longer fail with "Error opening file for writing" when
+  the app is running.** Installing an update on top of a running copy
+  used to leave orphaned Python sidecars (clip server, audio worker)
+  holding `_bz2.pyd` / FFmpeg DLLs open, blocking the file copy. The
+  main process now pins itself to a Windows Job Object with
+  `KILL_ON_JOB_CLOSE` so sidecars die automatically the moment the
+  main exe exits — for any reason, including the installer's hard
+  terminate. A new NSIS pre-install hook also runs
+  `taskkill /F /T` on the whole tree as a belt-and-suspenders pass.
+  Result: closing the app first is no longer required to update.
+- **"GPU Engine Needs Setup" modal no longer fires on every launch of
+  a healthy install.** Three bugs combined to trip the repair gate
+  even on working installs: the bundler was flattening
+  `tools/ffmpeg-shared/` (where nelux's FFmpeg DLLs live) into
+  `tools/`; the planner's nelux-importability probe spawned a fresh
+  subprocess that did not re-add the FFmpeg directory to Windows' DLL
+  search path; and the same probe did not `import torch` before
+  `import nelux` (nelux 0.10+ raises `ImportError: PyTorch must be
+  imported before Nelux.` otherwise). Reverted the bundler form to
+  preserve directory structure, and the probe now mirrors the
+  runtime's `os.add_dll_directory` + torch pre-import before the
+  nelux import. The modal previously claimed "Missing DLLs
+  (reinstall)" even though the DLLs were correct and Repair could
+  never fix the underlying issue.
+- **Clip extractor warmup no longer fails with the nelux FFmpeg DLL
+  load error.** Same root cause as above — with the bundler fix in
+  place, `tools/ffmpeg-shared/*.dll` end up at the path nelux expects.
+- **Engine Repair never leaves the install worse than it found it on
+  network failure.** Torch is now swapped via a single
+  `pip install --upgrade --force-reinstall` which downloads the
+  replacement wheel before removing the existing one. Previously a
+  failed download mid-Repair would leave the user with no torch at
+  all and Settings reporting packages as "missing".
+- **Clip extractor no longer breaks audio extraction on first launch in
+  CPU mode.** The clip server's warmup used to run its own dependency
+  reinstall in the background; if it raced with another tool's pip
+  call (or got killed mid-uninstall by a setup flow), the install
+  ended up with mismatched torch/torchvision wheels and a cryptic
+  `operator torchvision::nms does not exist` error from the next
+  separation. The auto-repair on warmup is gone — dependencies are
+  installed once during the setup wizard / Repair, and the clip
+  server now trusts that they're correct.
+- **Clip preview progress bar no longer drifts out of sync with the
+  looping clip.** The bar's CSS animation duration is now sourced from
+  the actual sum of per-frame delays encoded into the WebP (parsed
+  from its ANMF chunks), rather than the requested clip duration.
+  ffmpeg truncates per-frame delays to integer milliseconds (e.g.
+  83 ms instead of 83.33 ms at fps=12), which caused the bar to drift
+  ~5–10 ms per loop and visibly lap the WebP after a minute.
+- **Clip preview bar and WebP no longer desync after switching tabs and
+  coming back.** Returning to the Clip Hunting tab re-mounts every
+  visible tile so both the progress bar and the WebP restart from frame
+  0 in lockstep. The bar (a fresh DOM element) already restarted
+  cleanly, but Chromium was serving the WebP from its decoded image
+  cache and the animation continued mid-cycle — bar at 0%, WebP at
+  frame ~50. The img src now cache-busts on each activation so the
+  browser re-decodes from scratch.
+
+### Changed
+- **PyTorch CPU/GPU mode is detected from the wheel's local tag
+  (`+cu128` / `+cpu`) rather than a subprocess `torch.cuda.is_available()`
+  probe at startup.** The probe was flaky on cold boots — driver not
+  fully resident yet, first-import past the 10s timeout — and would
+  silently demote a working `+cu` install to "cpu", which itself
+  tripped the repair gate. `nvidia-smi` still gates whether GPU setup
+  is offered, so a `+cu` wheel on a CPU-only host is caught by the
+  right signal.
+
 ## [0.4.0] — 2026-05-11
 
 ### Added
@@ -89,6 +160,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Self-contained first-run setup wizard that installs PyTorch, audio-
   separator, and ONNX Runtime into a bundled Python environment.
 
+[0.4.1]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.4.1
 [0.4.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.4.0
 [0.3.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.2.0

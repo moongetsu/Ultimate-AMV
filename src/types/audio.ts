@@ -1,4 +1,4 @@
-export type AudioTab = "extract" | "history";
+export type AudioTab = "extract";
 
 export type AudioStatus = {
   type: "status";
@@ -50,15 +50,6 @@ export type AudioSetupPlan = {
   installs: string[][];
   success_mode: "cpu" | "gpu" | null;
   gpu_name?: string | null;
-};
-
-export type AudioHistoryItem = {
-  created_at: string;
-  input: string;
-  outputs: string[];
-  original_backup?: string | null;
-  model: string;
-  device: string;
 };
 
 export type AudioOutputFormat = "wav" | "mp3";

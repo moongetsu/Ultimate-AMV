@@ -5,7 +5,7 @@ import re
 import sys
 from pathlib import Path
 
-from .config import MODELS_DIR, add_history, add_recent_file, ensure_dirs
+from .config import MODELS_DIR, add_recent_file, ensure_dirs
 from .hardware import get_hw_info
 from .models import get_active_model, get_model_display_name, get_model_settings
 
@@ -213,19 +213,10 @@ def run_separation(input_file, model_name=None, progress_callback=None):
         )
 
         add_recent_file(str(input_path))
-        record = add_history(
-            {
-                "input": str(input_path),
-                "outputs": outputs,
-                "original_backup": original_backup,
-                "model": get_model_display_name(model_name),
-                "device": hw.get("device"),
-            }
-        )
 
         if progress_callback:
             progress_callback("complete", 100, "Extraction complete")
 
-        return {"ok": True, "record": record, "outputs": outputs}
+        return {"ok": True, "outputs": outputs}
     finally:
         _cleanup_resources(temp_input_path)

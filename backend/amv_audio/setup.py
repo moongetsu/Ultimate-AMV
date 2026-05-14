@@ -22,6 +22,37 @@ def _check_package(package):
         return False
 
 
+def _nelux_importable():
+    # Nelux's C extension has two non-obvious load requirements that a bare
+    # `python -c "import nelux"` subprocess would fail:
+    #   1. tools/ffmpeg-shared/ must be on the Windows DLL search path so
+    #      avcodec-62.dll / avformat-62.dll / etc. resolve. clip_cli.py
+    #      registers that path via os.add_dll_directory at module load.
+    #   2. torch must be imported first — nelux 0.10+'s __init__.py raises
+    #      `ImportError: PyTorch must be imported before Nelux.` otherwise.
+    # The probe below mirrors both pre-conditions before attempting the
+    # import, so a healthy install does not trip the repair gate.
+    probe = (
+        "import os, sys\n"
+        "from pathlib import Path\n"
+        "_d = Path(sys.executable).parent.parent / 'tools' / 'ffmpeg-shared'\n"
+        "if _d.exists():\n"
+        "    os.add_dll_directory(str(_d.resolve()))\n"
+        "import torch  # nelux requires torch to be imported first\n"
+        "import nelux\n"
+    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-I", "-c", probe],
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return False
+
+
 def _missing_audio_runtime_modules():
     missing = []
     for module, package in AUDIO_RUNTIME_MODULES:
@@ -47,25 +78,22 @@ def _missing_audio_runtime_modules():
 
 
 def _installed_torch_mode():
+    # Classify by wheel tag, not by torch.cuda.is_available(). The runtime
+    # probe is flaky on cold boots / right after install (driver not fully
+    # resident, slow first-import past timeout, subprocess crash with empty
+    # stdout) and would silently demote a working +cu install to "cpu",
+    # making the repair gate fire on every update with the misleading
+    # "Install PyTorch with CUDA 12.8" issue. The readiness check already
+    # gates on check_nvidia_gpu(), so a +cu wheel on a CPU-only host is
+    # still caught — just by the right signal.
     try:
         from importlib.metadata import version
         torch_version = version("torch")
-        torch_available = True
     except Exception:
         return "missing", None, False
 
-    cuda_ready = False
-    if "+cu" in torch_version:
-        try:
-            code = "import torch; print(torch.cuda.is_available())"
-            res = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, timeout=10)
-            cuda_ready = res.stdout.strip() == "True"
-        except Exception:
-            pass
-
-    if cuda_ready:
-        return "gpu", torch_version, True
-    return "cpu", torch_version, False
+    mode = "gpu" if "+cu" in torch_version else "cpu"
+    return mode, torch_version, mode == "gpu"
 
 
 def collect_setup_plan(mode):
@@ -88,14 +116,17 @@ def _collect_gpu_plan():
     missing_audio_runtime = _missing_audio_runtime_modules()
     ort_cpu = _check_package("onnxruntime")
     ort_gpu = _check_package("onnxruntime-gpu")
-    nelux = _check_package("nelux")
+    nelux_installed = _check_package("nelux")
+    nelux_importable = nelux_installed and _nelux_importable()
+    nelux = nelux_installed and nelux_importable
+    nelux_broken_binaries = nelux_installed and not nelux_importable
 
     rows.append({"component": "Detected GPU", "status": gpu_name or "No NVIDIA GPU found"})
     rows.append({"component": "Current Mode", "status": "NOT INSTALLED" if installed_mode == "missing" else installed_mode.upper()})
     rows.append({"component": "Target Mode", "status": "GPU (CUDA 12.8 / cu128)"})
     rows.append({"component": "PyTorch", "status": torch_version or "Missing"})
     rows.append({"component": "GPU Runtime", "status": "Installed" if ort_gpu else "Needs install"})
-    rows.append({"component": "Nelux Ultimate", "status": "Installed" if nelux else "Needs install"})
+    rows.append({"component": "Nelux Ultimate", "status": "Installed" if nelux else ("Missing DLLs (reinstall)" if nelux_broken_binaries else "Needs install")})
     rows.append({"component": "audio-separator", "status": "Installed" if audio_separator else "Needs install"})
     rows.append({"component": "Audio runtime deps", "status": "Installed" if not missing_audio_runtime else f"Missing {len(missing_audio_runtime)}"})
     rows.append({"component": "typing_extensions", "status": "Installed" if typing_extensions else "Needs install"})
@@ -115,6 +146,8 @@ def _collect_gpu_plan():
         issues.append("Install PyTorch with CUDA 12.8")
     if install_audio_separator:
         issues.append("Install audio-separator[gpu], typing_extensions, and pydub")
+    if nelux_broken_binaries:
+        issues.append("Reinstall Nelux (bundled FFmpeg DLLs missing)")
     if ort_cpu:
         issues.append("Remove CPU ONNX Runtime")
 
@@ -126,6 +159,7 @@ def _collect_gpu_plan():
             reinstall_torch=reinstall_torch,
             cleanup_cpu_runtime=ort_cpu,
             install_audio_separator=install_audio_separator,
+            force_reinstall_nelux=nelux_broken_binaries,
         ),
         "success_mode": None,
         "gpu_name": gpu_name,

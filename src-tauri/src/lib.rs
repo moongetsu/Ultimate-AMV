@@ -1133,13 +1133,6 @@ async fn audio_setup_plan(mode: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn audio_history() -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || run_audio_cli(&["history"]))
-        .await
-        .map_err(|error| error.to_string())?
-}
-
-#[tauri::command]
 async fn app_logs() -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || run_audio_cli(&["logs"]))
         .await
@@ -3680,14 +3673,16 @@ fn generate_clip_preview(
         .map(|metadata| metadata.len() > 1024)
         .unwrap_or(false)
     {
-        return serialize_clip_preview_done(job.scene_id, job.output, job.duration, true);
+        let actual_duration = probe_webp_duration(&job.output).unwrap_or(job.duration);
+        return serialize_clip_preview_done(job.scene_id, job.output, actual_duration, true);
     }
 
     let use_gpu = *H264_NVENC_AVAILABLE
         .get_or_init(|| ffmpeg_listing(&ffmpeg, "-encoders").contains("h264_nvenc"));
     render_single_preview_job(&ffmpeg, &job, use_gpu)?;
 
-    serialize_clip_preview_done(job.scene_id, job.output, job.duration, false)
+    let actual_duration = probe_webp_duration(&job.output).unwrap_or(job.duration);
+    serialize_clip_preview_done(job.scene_id, job.output, actual_duration, false)
 }
 
 struct ResolvedClipPreviewJob {
@@ -3782,10 +3777,11 @@ fn generate_clip_preview_batch(
                     .map(|metadata| metadata.len() > 1024)
                     .unwrap_or(false)
                 {
+                    let actual_duration = probe_webp_duration(&job.output).unwrap_or(job.duration);
                     items.push(ClipPreviewBatchItem {
                         scene_id: job.scene_id,
                         path: Some(job.output.to_string_lossy().to_string()),
-                        duration: job.duration,
+                        duration: actual_duration,
                         cached: true,
                         error: None,
                     });
@@ -3811,13 +3807,17 @@ fn generate_clip_preview_batch(
                 .iter()
                 .map(|job| {
                     scope.spawn(move || match render_single_preview_job(ffmpeg_path, job, use_gpu) {
-                        Ok(()) => ClipPreviewBatchItem {
-                            scene_id: job.scene_id.clone(),
-                            path: Some(job.output.to_string_lossy().to_string()),
-                            duration: job.duration,
-                            cached: false,
-                            error: None,
-                        },
+                        Ok(()) => {
+                            let actual_duration =
+                                probe_webp_duration(&job.output).unwrap_or(job.duration);
+                            ClipPreviewBatchItem {
+                                scene_id: job.scene_id.clone(),
+                                path: Some(job.output.to_string_lossy().to_string()),
+                                duration: actual_duration,
+                                cached: false,
+                                error: None,
+                            }
+                        }
                         Err(error) => ClipPreviewBatchItem {
                             scene_id: job.scene_id.clone(),
                             path: None,
@@ -3914,6 +3914,45 @@ fn preview_proxy_duration(start: f64, end: f64, fps: f64) -> f64 {
 
 fn round_seconds(value: f64) -> f64 {
     (value * 1000.0).round() / 1000.0
+}
+
+// Sum the exact per-frame delays encoded into an animated WebP so the CSS
+// loop animation matches the WebP playback frame-for-frame. ffmpeg truncates
+// per-frame delays to integer milliseconds (e.g. 83ms instead of 83.33ms at
+// fps=12), which would otherwise drift visibly over a few loops.
+fn probe_webp_duration(path: &Path) -> Option<f64> {
+    let bytes = fs::read(path).ok()?;
+    if bytes.len() < 12 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WEBP" {
+        return None;
+    }
+    let mut offset = 12usize;
+    let mut total_ms: u64 = 0;
+    while offset + 8 <= bytes.len() {
+        let tag = &bytes[offset..offset + 4];
+        let size = u32::from_le_bytes([
+            bytes[offset + 4],
+            bytes[offset + 5],
+            bytes[offset + 6],
+            bytes[offset + 7],
+        ]) as usize;
+        let payload_start = offset + 8;
+        let payload_end = payload_start.checked_add(size)?;
+        if payload_end > bytes.len() {
+            break;
+        }
+        if tag == b"ANMF" && size >= 16 {
+            let dur_lo = bytes[payload_start + 12] as u32;
+            let dur_mid = bytes[payload_start + 13] as u32;
+            let dur_hi = bytes[payload_start + 14] as u32;
+            total_ms += (dur_lo | (dur_mid << 8) | (dur_hi << 16)) as u64;
+        }
+        offset = payload_end + (size & 1);
+    }
+    if total_ms == 0 {
+        None
+    } else {
+        Some(total_ms as f64 / 1000.0)
+    }
 }
 
 fn run_preview_ffmpeg(
@@ -4966,10 +5005,85 @@ fn open_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
     result
 }
 
+// Assign the current process to a Windows Job Object configured with
+// JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE so every Python sidecar we spawn
+// dies automatically when this process exits — even on TerminateProcess
+// (which the installer uses) or an unexpected crash, where the normal
+// CloseRequested handler does not run. Without this, orphaned python.exe
+// children keep _bz2.pyd / *.dll handles open and the next installer
+// hits "file in use" errors on update.
+#[cfg(target_os = "windows")]
+fn setup_kill_on_close_job() {
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+    use windows::Win32::System::Threading::GetCurrentProcess;
+
+    unsafe {
+        let job = match CreateJobObjectW(None, windows::core::PCWSTR::null()) {
+            Ok(handle) => handle,
+            Err(error) => {
+                log_warn(
+                    "app.jobobject.create.error",
+                    "Could not create job object for sidecar cleanup",
+                    json!({ "error": error.to_string() }),
+                );
+                return;
+            }
+        };
+
+        let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if let Err(error) = SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            &info as *const _ as *const _,
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        ) {
+            log_warn(
+                "app.jobobject.configure.error",
+                "Could not configure job object for sidecar cleanup",
+                json!({ "error": error.to_string() }),
+            );
+            let _ = CloseHandle(job);
+            return;
+        }
+
+        if let Err(error) = AssignProcessToJobObject(job, GetCurrentProcess()) {
+            // Already inside a non-nestable job (e.g. some Windows Sandbox /
+            // container environments). The on-close handler is still our
+            // fallback; not fatal.
+            log_warn(
+                "app.jobobject.assign.error",
+                "Could not assign main process to job object — relying on close-event cleanup",
+                json!({ "error": error.to_string() }),
+            );
+            let _ = CloseHandle(job);
+            return;
+        }
+
+        log_info(
+            "app.jobobject.ready",
+            "Job object assigned — Python sidecars will auto-terminate with the main process",
+            Value::Null,
+        );
+        // windows-rs HANDLE is a Copy newtype with no Drop, so the kernel
+        // handle persists past this scope. The kernel auto-closes it when
+        // we exit, which is precisely when KILL_ON_JOB_CLOSE should fire
+        // to terminate any surviving sidecars.
+        let _ = job;
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     reset_app_logs();
     log_info("app.start", "Ultimate AMV app starting", Value::Null);
+    #[cfg(target_os = "windows")]
+    setup_kill_on_close_job();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -4993,7 +5107,6 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             audio_status,
-            audio_history,
             app_logs,
             clear_app_logs,
             clear_app_cache,

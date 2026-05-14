@@ -679,27 +679,30 @@ def extract_gpu_nelux_with_model(input_path, info, threshold, min_clip_seconds, 
 
 
 def server():
-    started_at = time.perf_counter()
     emit({"type": "log", "message": "Clip Server warming up..."})
-    
+
+    # Do NOT call ensure_feature_dependencies here. The Root.tsx startup
+    # gate already validates the engine before letting the user reach the
+    # clip extractor, and running pip install from this short-lived warmup
+    # process is the source of a nasty race: if the user triggers any other
+    # mode-switch (audio_setup, etc.) while the install is mid-flight,
+    # stop_clip_processes_for_dependency_setup kills the pip subprocess
+    # mid-uninstall and leaves torch/torchvision in mismatched versions
+    # (e.g. torch+cpu with torchvision+cu128 → "operator torchvision::nms
+    # does not exist"). Just try the imports; fail loudly if anything's
+    # missing so the user can run Repair from the settings panel.
     try:
-        ensure_feature_dependencies(
-            "clip_gpu",
-            gpu=True,
-            progress_callback=lambda stage, percent, message: progress("dependencies", percent, message, started_at),
-        )
         import torch
         import nelux
         from transnetv2_pytorch import TransNetV2
-        
+
         device = torch.device("cuda")
         model = TransNetV2(device=device)
         model.eval()
-        
-        # Verify CUDA is actually working
+
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA not available in server mode")
-            
+
         emit({"type": "log", "message": f"Clip Server warmed up on {torch.cuda.get_device_name(0)}"})
     except Exception as e:
         emit({"type": "error", "message": f"Clip Server warmup failed: {e}"})

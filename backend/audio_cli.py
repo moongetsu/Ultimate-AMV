@@ -11,7 +11,7 @@ _tools_dir = str(Path(sys.executable).parent.parent / "tools")
 if _tools_dir not in os.environ.get("PATH", ""):
     os.environ["PATH"] = _tools_dir + os.pathsep + os.environ.get("PATH", "")
 
-from amv_audio.config import get_history, load_config, save_config
+from amv_audio.config import load_config, save_config
 from amv_audio.dependencies import ensure_feature_dependencies, repair_missing_module
 from amv_audio.hardware import get_dependency_info, get_hw_info
 from amv_audio.logs import add_log, get_terminal_logs
@@ -45,10 +45,6 @@ def status():
             "model_name": get_model_display_name(model),
         }
     )
-
-
-def history():
-    emit({"type": "history", "items": get_history()})
 
 
 def logs():
@@ -221,7 +217,6 @@ def main():
     parser = argparse.ArgumentParser(description="Ultimate AMV audio extraction bridge")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("status")
-    sub.add_parser("history")
     sub.add_parser("logs")
     sub.add_parser("config")
     set_config_parser = sub.add_parser("set-config")
@@ -237,9 +232,6 @@ def main():
 
     if args.command == "status":
         status()
-        return 0
-    if args.command == "history":
-        history()
         return 0
     if args.command == "logs":
         logs()

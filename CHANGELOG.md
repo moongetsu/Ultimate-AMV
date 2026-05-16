@@ -5,6 +5,68 @@ All notable changes to Ultimate AMV are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-05-16
+
+### Added
+- **Silent in-app auto-updater.** Settings now has an "App Updates" card
+  at the top showing the current version and a "Check for updates"
+  button that polls the GitHub release feed. When a newer version is
+  found, the release notes are previewed inline and a single click
+  downloads the new installer in the background — keep the app open and
+  use it normally while it downloads. When ready, the button changes to
+  "Restart to apply update": clicking it quits the app, runs the new
+  installer silently (no wizard, no prompts), and relaunches the new
+  version. The whole sequence takes 3–6 seconds of visible downtime
+  with no user-installed packages disturbed (your GPU/CPU torch wheel,
+  audio-separator, nelux, etc. all survive the additive overlay
+  install). Releases are cryptographically signed with a minisign
+  keypair; the updater verifies the signature before installing, so a
+  tampered or substituted installer is rejected. The CI workflow is
+  the only thing with the private key.
+- **First-launch tools-download gate.** Replaces the old approach of
+  bundling FFmpeg / ffprobe / yt-dlp / the shared FFmpeg DLLs nelux
+  needs inside the installer. On first launch a "Setting up media
+  tools" gate downloads them (about 200 MB total) into a per-user
+  cache at `%LOCALAPPDATA%\com.elishapervez.ultimateamv\tools\` and
+  verifies every binary against a pinned SHA256 from `tools.json`.
+  This is a one-time cost — subsequent auto-updates only ship the app
+  code and apply in seconds. The cache lives outside the install
+  directory, so reinstalls and uninstalls don't disturb it.
+- **`tools_status`, `tools_install`, `tools_cancel` Tauri commands**
+  for the new gate. `tools-progress` events stream per-binary
+  download + verify + install state with byte-level granularity.
+- **`ULTIMATE_AMV_TOOLS_DIR` environment variable** is set on every
+  Python sidecar spawn (audio bridge, clip bridge, clip server, and
+  the nelux importability probe in `_nelux_importable()`).
+  `clip_cli.py` and `audio_cli.py` consult it to locate
+  ffmpeg/ffprobe/yt-dlp and to register the ffmpeg-shared DLL
+  directory with `os.add_dll_directory` for nelux's C extension.
+- **`prepare_for_update` Tauri command** runs before the updater's
+  `install()` to kill Python sidecars synchronously (so they don't
+  hold `_bz2.pyd` / `python.exe` open during the file replace) and
+  to clear `KILL_ON_JOB_CLOSE` from the Windows Job Object (so the
+  installer survives our exit instead of being killed alongside the
+  main process).
+
+### Changed
+- **Installer is now ~30 MB instead of ~185 MB.** FFmpeg, ffprobe,
+  yt-dlp, and the shared FFmpeg DLLs no longer ship inside the NSIS
+  installer — see the tools-download gate above.
+- **Tool versions are pinned in `tools.json` at the repo root.**
+  Bumping a binary is a manifest change + matching SHA256 update.
+  Current pins: yt-dlp 2026.03.17, FFmpeg static
+  `autobuild-2026-05-15-13-34` (master, GPL), FFmpeg shared DLLs
+  `autobuild-2026-05-15-13-34` (n8.1 branch — the avcodec-62 ABI
+  nelux is built against).
+- **CI no longer downloads FFmpeg / yt-dlp** during the release
+  build. `.github/workflows/release.yml` drops three binary-fetch
+  steps and ships `tools.json` as a Tauri resource, so the installer
+  artifact is purely app code + Python runtime.
+- **`core:app:default` capability granted** so the frontend can read
+  the bundled app version at runtime.
+
+[0.7.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.7.0
+
 ## [0.6.0] — 2026-05-16
 
 ### Added
@@ -239,6 +301,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Self-contained first-run setup wizard that installs PyTorch, audio-
   separator, and ONNX Runtime into a bundled Python environment.
 
+[0.6.2]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.6.2
+[0.6.1]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.6.1
 [0.6.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.6.0
 [0.5.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.5.0
 [0.4.1]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.4.1

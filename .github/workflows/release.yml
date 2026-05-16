@@ -44,71 +44,34 @@ jobs:
         shell: pwsh
         run: ./bundle-deps.ps1
 
-      # ── Bundled tools (yt-dlp, ffmpeg, ffprobe) ───────────────────────────
-      - name: Download yt-dlp
+      # ── Tools manifest sanity check ───────────────────────────────────────
+      # tools/ is no longer bundled into the installer. The app downloads
+      # ffmpeg/ffprobe/yt-dlp on first launch into a per-user cache,
+      # verified against the SHA256s pinned in tools.json. CI just makes
+      # sure the manifest is parseable before kicking off the bundle.
+      - name: Validate tools.json
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path tools | Out-Null
-          Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile "tools\yt-dlp.exe"
-
-      - name: Download ffmpeg + ffprobe
-        shell: pwsh
-        run: |
-          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
-          $zip = "$env:TEMP\ffmpeg.zip"
-          Invoke-WebRequest -Uri $url -OutFile $zip
-          $tmp = "$env:TEMP\ffmpeg-extract"
-          Expand-Archive -Path $zip -DestinationPath $tmp -Force
-          $bin = Get-ChildItem -Path $tmp -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
-          Copy-Item $bin.FullName -Destination "tools\ffmpeg.exe"
-          $bin2 = Get-ChildItem -Path $tmp -Recurse -Filter "ffprobe.exe" | Select-Object -First 1
-          Copy-Item $bin2.FullName -Destination "tools\ffprobe.exe"
-          Remove-Item $zip, $tmp -Recurse -Force
-
-      - name: Download FFmpeg shared DLLs (for nelux clip extractor)
-        shell: pwsh
-        run: |
-          # nelux's C extension loads libavcodec / libavformat / etc. via
-          # Windows DLL search at import time. clip_cli.py registers
-          # tools\ffmpeg-shared\ with os.add_dll_directory, so the shared-
-          # build FFmpeg DLLs must live there in the installer bundle. The
-          # static ffmpeg.exe step above does NOT provide these — it's a
-          # single fat binary with everything statically linked, so it
-          # works for the bundled tools but cannot satisfy nelux.
-          #
-          # Pinned to the n8.1 branch because nelux's current wheel is
-          # built against libavcodec.so.62 (the major in FFmpeg 8.x — 8.0
-          # shipped 62.x, 8.1 stays 62.x, ABI-compatible). If BtbN ever
-          # stops publishing n8.1 shared builds — or nelux's wheel jumps
-          # to a newer avcodec major (likely libavcodec.so.63 with the
-          # FFmpeg 9.0 cut) — update this URL accordingly. Master builds
-          # would NOT work today because master is already FFmpeg 9-pre
-          # and ships avcodec-63.dll.
-          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-gpl-shared-8.1.zip"
-          $zip = "$env:TEMP\ffmpeg-shared.zip"
-          Invoke-WebRequest -Uri $url -OutFile $zip
-          $tmp = "$env:TEMP\ffmpeg-shared-extract"
-          Expand-Archive -Path $zip -DestinationPath $tmp -Force
-          New-Item -ItemType Directory -Force -Path "tools\ffmpeg-shared" | Out-Null
-          # BtbN's shared zip puts DLLs in <root>\bin\; we want the DLLs
-          # flat under tools\ffmpeg-shared\ (matching clip_cli.py's path).
-          Get-ChildItem -Path $tmp -Recurse -Filter "*.dll" |
-            Where-Object { $_.FullName -like '*\bin\*' } |
-            ForEach-Object { Copy-Item $_.FullName -Destination "tools\ffmpeg-shared\$($_.Name)" }
-          $copied = Get-ChildItem -Path "tools\ffmpeg-shared" -Filter "*.dll"
-          if ($copied.Count -eq 0) {
-            Write-Error "No DLLs were copied into tools\ffmpeg-shared\. BtbN may have changed the zip layout — inspect $tmp and update this step."
+          if (-not (Test-Path tools.json)) {
+            Write-Error "tools.json missing at repo root."
             exit 1
           }
-          Write-Host "Staged $($copied.Count) FFmpeg shared DLLs for nelux:"
-          $copied | ForEach-Object { Write-Host "  $($_.Name)" }
-          Remove-Item $zip, $tmp -Recurse -Force
+          try {
+            $manifest = Get-Content tools.json -Raw | ConvertFrom-Json
+          } catch {
+            Write-Error "tools.json failed to parse: $($_.Exception.Message)"
+            exit 1
+          }
+          Write-Host "tools.json manifest_version=$($manifest.manifest_version) binaries=$($manifest.binaries.Count)"
 
       # ── Frontend + Tauri build ─────────────────────────────────────────────
       - name: Install npm dependencies
         run: npm ci
 
       - name: Build Tauri app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build
 
       # ── Publish GitHub Release ─────────────────────────────────────────────
@@ -131,9 +94,47 @@ jobs:
           Get-Content release-notes.md
           Write-Host "::endgroup::"
 
+      - name: Generate updater manifest (latest.json)
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          $bundleDir = "src-tauri/target/release/bundle/nsis"
+          $exe = Get-ChildItem -Path $bundleDir -Filter "*.exe" | Select-Object -First 1
+          if (-not $exe) { Write-Error "No .exe found in $bundleDir"; exit 1 }
+          $sig = Get-ChildItem -Path $bundleDir -Filter "*.exe.sig" | Select-Object -First 1
+          if (-not $sig) { Write-Error "No .exe.sig found in $bundleDir. Did TAURI_SIGNING_PRIVATE_KEY get set on the build step?"; exit 1 }
+          $signature = Get-Content $sig.FullName -Raw
+          $notes = Get-Content release-notes.md -Raw
+          $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+          # GitHub Releases rewrites spaces in uploaded asset filenames to dots
+          # (e.g. "Ultimate AMV_0.6.0_x64-setup.exe" → "Ultimate.AMV_0.6.0_x64-setup.exe"),
+          # so the local filename and the public download URL diverge. Mirror that
+          # transform here, otherwise the updater fetches a 404.
+          $assetName = $exe.Name.Replace(' ', '.')
+          $downloadUrl = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$assetName"
+          $manifest = @{
+            version = $version
+            notes = $notes
+            pub_date = $pubDate
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = $signature.Trim()
+                url = $downloadUrl
+              }
+            }
+          }
+          $json = $manifest | ConvertTo-Json -Depth 10
+          Set-Content -Path latest.json -Value $json -Encoding utf8
+          Write-Host "::group::latest.json"
+          Get-Content latest.json
+          Write-Host "::endgroup::"
+
       - name: Upload installer to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.exe.sig
+            latest.json
+            tools.json
           body_path: release-notes.md

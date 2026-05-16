@@ -8,6 +8,7 @@ import { applyAppTheme, readThemeColors } from "../../lib/theme";
 import { parseBridgePayload, readBridgeError } from "../../utils/bridge";
 import type { AppConfig } from "../../types/app";
 import type { AudioSetupProgress, AudioStatus } from "../../types/audio";
+import { UpdateCard } from "./UpdateCard";
 
 function formatSetupLogLine(progress: AudioSetupProgress): string {
   const parts = [];
@@ -178,6 +179,7 @@ export function SettingsPanel() {
 
       <div className="settings-groups">
 
+        <UpdateCard />
 
         <div className="settings-group">
           <div className="settings-group-header">AI Hardware Engine</div>

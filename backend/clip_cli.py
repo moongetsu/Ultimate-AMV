@@ -11,8 +11,26 @@ from pathlib import Path
 
 from amv_audio.dependencies import ensure_feature_dependencies, repair_missing_module
 
-# Hardware-accelerated DLL discovery for torchcodec/nelux
-ffmpeg_shared = Path(sys.executable).parent.parent / "tools" / "ffmpeg-shared"
+
+def _resolve_tools_dir():
+    # The Rust shell sets ULTIMATE_AMV_TOOLS_DIR to the per-user tools cache
+    # (app_local_data_dir/tools/) once Phase 2's tools gate finishes the
+    # first-launch download. Honor that first; fall back to the legacy
+    # bundled-next-to-python.exe layout only when the env var is missing
+    # (e.g. the script is invoked outside the Tauri shell during dev).
+    env_dir = os.environ.get("ULTIMATE_AMV_TOOLS_DIR")
+    if env_dir:
+        return Path(env_dir)
+    return Path(sys.executable).parent.parent / "tools"
+
+
+_tools_dir = _resolve_tools_dir()
+
+# nelux's C extension load chain: avcodec-62.dll / avformat-62.dll / etc.
+# resolve via Windows DLL search at import time. Without this directory on
+# the search path, `import nelux` fails with a DLL-not-found OSError on
+# Windows.
+ffmpeg_shared = _tools_dir / "ffmpeg-shared"
 if ffmpeg_shared.exists():
     os.add_dll_directory(str(ffmpeg_shared.resolve()))
 
@@ -53,10 +71,10 @@ def progress(stage, percent, message, started_at):
 
 
 def require_tool(name):
-    bundled = Path(sys.executable).parent.parent / "tools" / f"{name}.exe"
+    bundled = _tools_dir / f"{name}.exe"
     if not bundled.exists():
         raise RuntimeError(
-            f"{name} not found at {bundled}. The app is hermetic — bundled tools/ must contain {name}.exe."
+            f"{name} not found at {bundled}. The first-launch tools download did not complete; relaunch the app and let the setup gate finish."
         )
     return str(bundled)
 

@@ -6,9 +6,14 @@ import { SetupWizard } from "../SetupWizard";
 import { parseBridgePayload, readBridgeError } from "../utils/bridge";
 import type { AppConfig } from "../types/app";
 import type { AudioSetupPlan, AudioSetupProgress } from "../types/audio";
+import { ToolsGate } from "../features/setup/ToolsGate";
 import { App } from "./App";
 
 export function Root() {
+  // The tools gate runs before any other startup work — ffmpeg/ffprobe/yt-dlp
+  // are no longer bundled (Phase 2), and downstream code (audio bridge config
+  // load, clip server warmup) assumes the bundled-tool paths are populated.
+  const [toolsReady, setToolsReady] = React.useState<boolean>(false);
   const [setupComplete, setSetupComplete] = React.useState<boolean | null>(null);
   const [startupState, setStartupState] = React.useState<"idle" | "checking" | "ready" | "needs-repair" | "repairing" | "error">("idle");
   const [startupMode, setStartupMode] = React.useState<"cpu" | "gpu" | null>(null);
@@ -19,6 +24,7 @@ export function Root() {
   const startupRepairRunningRef = React.useRef(false);
 
   React.useEffect(() => {
+    if (!toolsReady) return;
     invoke<string>("get_config")
       .then((raw) => {
         try {
@@ -29,7 +35,7 @@ export function Root() {
         }
       })
       .catch(() => setSetupComplete(false));
-  }, []);
+  }, [toolsReady]);
 
   React.useEffect(() => {
     if (setupComplete === true) {
@@ -142,6 +148,10 @@ export function Root() {
       return "is-installed";
     }
     return "";
+  }
+
+  if (!toolsReady) {
+    return <ToolsGate onReady={() => setToolsReady(true)} />;
   }
 
   if (setupComplete === null) {

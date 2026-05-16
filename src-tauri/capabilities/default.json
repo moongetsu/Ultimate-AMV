@@ -4,6 +4,7 @@
   "description": "Default app permissions",
   "windows": ["main"],
   "permissions": [
+    "core:app:default",
     "core:window:default",
     "core:window:allow-close",
     "core:window:allow-minimize",
@@ -17,6 +18,7 @@
     "core:webview:allow-set-webview-focus",
     "core:webview:allow-webview-close",
     "dialog:default",
-    "opener:default"
+    "opener:default",
+    "updater:default"
   ]
 }

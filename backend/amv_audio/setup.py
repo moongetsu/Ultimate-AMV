@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 import importlib.util
@@ -28,6 +29,10 @@ def _nelux_importable():
     #   1. tools/ffmpeg-shared/ must be on the Windows DLL search path so
     #      avcodec-62.dll / avformat-62.dll / etc. resolve. clip_cli.py
     #      registers that path via os.add_dll_directory at module load.
+    #      Phase 2 moved this dir from a bundled tools/ to a per-user
+    #      app_local_data_dir/tools/, so the probe must consult the
+    #      ULTIMATE_AMV_TOOLS_DIR env var first (set by the Rust shell)
+    #      and fall back to the legacy path only for out-of-shell dev runs.
     #   2. torch must be imported first — nelux 0.10+'s __init__.py raises
     #      `ImportError: PyTorch must be imported before Nelux.` otherwise.
     # The probe below mirrors both pre-conditions before attempting the
@@ -35,18 +40,26 @@ def _nelux_importable():
     probe = (
         "import os, sys\n"
         "from pathlib import Path\n"
-        "_d = Path(sys.executable).parent.parent / 'tools' / 'ffmpeg-shared'\n"
+        "_env = os.environ.get('ULTIMATE_AMV_TOOLS_DIR')\n"
+        "_root = Path(_env) if _env else Path(sys.executable).parent.parent / 'tools'\n"
+        "_d = _root / 'ffmpeg-shared'\n"
         "if _d.exists():\n"
         "    os.add_dll_directory(str(_d.resolve()))\n"
         "import torch  # nelux requires torch to be imported first\n"
         "import nelux\n"
     )
     try:
+        # Pass the parent process env explicitly so ULTIMATE_AMV_TOOLS_DIR
+        # (set by the Rust shell on the audio_cli sidecar) reaches the
+        # probe child. subprocess.run inherits env by default, but being
+        # explicit makes the dependency obvious and survives any future
+        # caller that overrides env=.
         result = subprocess.run(
             [sys.executable, "-I", "-c", probe],
             capture_output=True,
             text=True,
             timeout=20,
+            env=os.environ.copy(),
         )
         return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
@@ -226,7 +239,6 @@ def apply_success_mode(mode):
 
 
 def _fix_pth_file():
-    import os
     python_dir = os.path.dirname(sys.executable)
     for name in os.listdir(python_dir):
         if name.endswith("._pth"):
@@ -251,7 +263,6 @@ def _ensure_pip(progress_callback):
     except Exception:
         pass
 
-    import os
     import tempfile
     import urllib.request
 

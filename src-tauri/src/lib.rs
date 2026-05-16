@@ -20,6 +20,8 @@ use tauri::async_runtime::Mutex as AsyncMutex;
 use tokio::process::{Child as AsyncChild, Command as AsyncCommand};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader as AsyncBufReader};
 
+mod tools;
+
 #[derive(Clone, Serialize)]
 struct MediaCandidate {
     url: String,
@@ -234,6 +236,12 @@ static AUDIO_CHILD_PID: OnceLock<Mutex<Option<u32>>> = OnceLock::new();
 static CLIP_CHILD_PID: OnceLock<Mutex<Option<u32>>> = OnceLock::new();
 static DOWNLOAD_CHILD_PID: OnceLock<Mutex<Option<u32>>> = OnceLock::new();
 static VIDEO_CHILD_PID: OnceLock<Mutex<Option<u32>>> = OnceLock::new();
+// Raw HANDLE to the Job Object set up by setup_kill_on_close_job().
+// Stored as usize so we can revisit it across threads / from a Tauri command
+// (windows-rs HANDLE is !Send). prepare_for_update() reopens it to drop
+// KILL_ON_JOB_CLOSE, otherwise the auto-updater's installer dies with us.
+#[cfg(target_os = "windows")]
+static JOB_HANDLE_RAW: OnceLock<usize> = OnceLock::new();
 static H264_NVENC_AVAILABLE: OnceLock<bool> = OnceLock::new();
 static CLIP_SERVER: OnceLock<AsyncMutex<Option<AsyncChild>>> = OnceLock::new();
 
@@ -364,8 +372,54 @@ fn python_exe(root: &Path) -> PathBuf {
     root.join("python").join("python.exe")
 }
 
+// Tools (ffmpeg/ffprobe/yt-dlp + the ffmpeg-shared DLLs that nelux loads via
+// os.add_dll_directory) are no longer bundled inside the installer. They live
+// in the per-user app_local_data_dir and are downloaded on first launch by
+// the tools gate (see src-tauri/src/tools.rs). The Tauri setup callback
+// initializes TOOLS_DIR_OVERRIDE; every code path that needs ffmpeg /
+// ffprobe / yt-dlp reads from there, and every Python sidecar spawn
+// propagates the resolved path through the ULTIMATE_AMV_TOOLS_DIR env var
+// so backend/clip_cli.py's add_dll_directory call (and the matching probe
+// in backend/amv_audio/setup.py:_nelux_importable) point at the right
+// place.
+static TOOLS_DIR_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
+
+fn tools_dir_path(root: &Path) -> PathBuf {
+    if let Some(dir) = TOOLS_DIR_OVERRIDE.get() {
+        return dir.clone();
+    }
+    if let Ok(env_dir) = std::env::var("ULTIMATE_AMV_TOOLS_DIR") {
+        return PathBuf::from(env_dir);
+    }
+    // Dev fallback only — when running from a checkout that still has a
+    // local tools/ tree for legacy reasons, this lets `cargo run` work
+    // before the gate has populated app_local_data_dir/tools/.
+    root.join("tools")
+}
+
 fn find_tool(root: &Path, name: &str) -> PathBuf {
-    root.join("tools").join(format!("{name}.exe"))
+    tools_dir_path(root).join(format!("{name}.exe"))
+}
+
+fn python_sidecar_env() -> Vec<(&'static str, std::ffi::OsString)> {
+    let mut env: Vec<(&'static str, std::ffi::OsString)> =
+        vec![("ULTIMATE_AMV_STATE_DIR", app_state_dir().into_os_string())];
+    if let Some(dir) = TOOLS_DIR_OVERRIDE.get() {
+        env.push(("ULTIMATE_AMV_TOOLS_DIR", dir.clone().into_os_string()));
+    }
+    env
+}
+
+fn apply_python_env(command: &mut Command) {
+    for (key, value) in python_sidecar_env() {
+        command.env(key, value);
+    }
+}
+
+fn apply_python_env_async(command: &mut AsyncCommand) {
+    for (key, value) in python_sidecar_env() {
+        command.env(key, value);
+    }
 }
 
 fn cmd(program: impl AsRef<std::ffi::OsStr>) -> Command {
@@ -419,12 +473,14 @@ fn run_audio_cli(args: &[&str]) -> Result<String, String> {
             json!({ "args": args }),
         );
     }
-    let output = cmd(python_exe(&root))
+    let mut command = cmd(python_exe(&root));
+    command
         .arg("-I")
         .arg(audio_cli_path(&root))
         .args(args)
-        .env("ULTIMATE_AMV_STATE_DIR", app_state_dir())
-        .current_dir(root)
+        .current_dir(&root);
+    apply_python_env(&mut command);
+    let output = command
         .output()
         .map_err(|error| format!("Could not start Python audio bridge: {error}"))?;
 
@@ -1415,8 +1471,9 @@ fn normalized_referer(referer: &str) -> String {
 }
 
 fn ytdlp_command(root: &Path, url: &str) -> Command {
-    let mut command = cmd(root.join("tools").join("yt-dlp.exe"));
+    let mut command = cmd(tools_dir_path(root).join("yt-dlp.exe"));
     command.env("PYTHONUNBUFFERED", "1");
+    apply_python_env(&mut command);
     command.arg("--js-runtimes").arg("node");
     command.arg(url);
     command
@@ -4565,6 +4622,7 @@ async fn warmup_clip_server(app: tauri::AppHandle) -> Result<(), String> {
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
+    apply_python_env_async(&mut command);
 
     #[cfg(target_os = "windows")]
     {
@@ -4995,23 +5053,23 @@ fn run_streaming_audio_cli(
         "Starting streaming audio bridge",
         json!({ "args": &args, "progressEvent": progress_event }),
     );
-    let mut child = cmd(python_exe(&root))
+    let mut command = cmd(python_exe(&root));
+    command
         .arg("-I")
         .arg(audio_cli_path(&root))
         .args(&args)
-        .env("ULTIMATE_AMV_STATE_DIR", app_state_dir())
-        .current_dir(root)
+        .current_dir(&root)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| {
-            log_error(
-                "audio.streaming_bridge.spawn.error",
-                "Could not start streaming audio bridge",
-                json!({ "args": &args, "error": error.to_string() }),
-            );
-            format!("Could not start Python audio bridge: {error}")
-        })?;
+        .stderr(Stdio::piped());
+    apply_python_env(&mut command);
+    let mut child = command.spawn().map_err(|error| {
+        log_error(
+            "audio.streaming_bridge.spawn.error",
+            "Could not start streaming audio bridge",
+            json!({ "args": &args, "error": error.to_string() }),
+        );
+        format!("Could not start Python audio bridge: {error}")
+    })?;
     store_child_pid(&AUDIO_CHILD_PID, child.id());
 
     let stdout = child
@@ -5120,22 +5178,23 @@ fn run_streaming_clip_cli(window: tauri::Window, args: Vec<String>) -> Result<St
         "Starting one-shot clip bridge",
         json!({ "args": &args }),
     );
-    let mut child = cmd(python_exe(&root))
+    let mut command = cmd(python_exe(&root));
+    command
         .arg("-I")
         .arg(clip_cli_path(&root))
         .args(&args)
-        .current_dir(root)
+        .current_dir(&root)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| {
-            log_error(
-                "clip.bridge.spawn.error",
-                "Could not start one-shot clip bridge",
-                json!({ "args": &args, "error": error.to_string() }),
-            );
-            format!("Could not start Python clip bridge: {error}")
-        })?;
+        .stderr(Stdio::piped());
+    apply_python_env(&mut command);
+    let mut child = command.spawn().map_err(|error| {
+        log_error(
+            "clip.bridge.spawn.error",
+            "Could not start one-shot clip bridge",
+            json!({ "args": &args, "error": error.to_string() }),
+        );
+        format!("Could not start Python clip bridge: {error}")
+    })?;
     store_child_pid(&CLIP_CHILD_PID, child.id());
 
     let stdout = child
@@ -5364,12 +5423,95 @@ fn setup_kill_on_close_job() {
             "Job object assigned — Python sidecars will auto-terminate with the main process",
             Value::Null,
         );
+        // Save the raw handle so prepare_for_update can drop
+        // KILL_ON_JOB_CLOSE before the auto-updater spawns the installer
+        // (the installer inherits the job and would otherwise be killed
+        // when we exit, leaving the user on the old version).
+        let _ = JOB_HANDLE_RAW.set(job.0 as usize);
         // windows-rs HANDLE is a Copy newtype with no Drop, so the kernel
         // handle persists past this scope. The kernel auto-closes it when
         // we exit, which is precisely when KILL_ON_JOB_CLOSE should fire
         // to terminate any surviving sidecars.
         let _ = job;
     }
+}
+
+// Called by the Settings → Update card right before tauri-plugin-updater's
+// install() spawns the new installer. Two things have to happen first:
+//
+//  1. Kill the Python sidecars synchronously. install() is going to exit
+//     the main exe via TerminateProcess, which does NOT fire our
+//     CloseRequested handler — so the children would otherwise survive
+//     long enough to hold _bz2.pyd / python.exe handles open while NSIS
+//     tries to overwrite them.
+//
+//  2. Drop JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE from the job. The installer
+//     is spawned as a child of this process and therefore inherits the
+//     job. When we exit, the kernel closes our last handle to the job,
+//     and KILL_ON_JOB_CLOSE would terminate the installer mid-install —
+//     leaving the user stuck on the old version (no update applied, no
+//     auto-relaunch, no error). Clearing the flag lets the installer
+//     outlive us.
+#[tauri::command]
+fn prepare_for_update() -> Result<(), String> {
+    log_info(
+        "updater.prepare.start",
+        "Preparing for auto-update — killing sidecars and relaxing job object",
+        Value::Null,
+    );
+    kill_child_pid(&AUDIO_CHILD_PID);
+    kill_child_pid(&CLIP_CHILD_PID);
+    kill_child_pid(&DOWNLOAD_CHILD_PID);
+    kill_child_pid(&VIDEO_CHILD_PID);
+    if let Some(mutex) = CLIP_SERVER.get() {
+        let mut guard = mutex.blocking_lock();
+        if let Some(child) = guard.as_mut() {
+            let _ = child.start_kill();
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use windows::Win32::Foundation::HANDLE;
+        use windows::Win32::System::JobObjects::{
+            JobObjectExtendedLimitInformation, SetInformationJobObject,
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        };
+
+        let Some(&raw) = JOB_HANDLE_RAW.get() else {
+            log_warn(
+                "updater.prepare.no_job",
+                "No saved job handle — installer should survive anyway",
+                Value::Null,
+            );
+            return Ok(());
+        };
+        let job = HANDLE(raw as *mut _);
+        // Zeroed struct == LimitFlags cleared == no KILL_ON_JOB_CLOSE.
+        // The job object itself stays alive (still useful for sidecar
+        // accounting), it just stops killing its members on close.
+        let info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+        if let Err(error) = SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            &info as *const _ as *const _,
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        ) {
+            log_warn(
+                "updater.prepare.relax_failed",
+                "Could not clear KILL_ON_JOB_CLOSE — installer may be killed at exit",
+                json!({ "error": error.to_string() }),
+            );
+        } else {
+            log_info(
+                "updater.prepare.relaxed",
+                "Cleared KILL_ON_JOB_CLOSE — installer will survive process exit",
+                Value::Null,
+            );
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -5381,6 +5523,27 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .setup(|app| {
+            match tools::ensure_writable_tools_dir(&app.handle()) {
+                Ok(dir) => {
+                    let _ = TOOLS_DIR_OVERRIDE.set(dir.clone());
+                    log_info(
+                        "tools.dir.ready",
+                        "Tools directory resolved",
+                        json!({ "tools_dir": dir.display().to_string() }),
+                    );
+                }
+                Err(error) => {
+                    log_error(
+                        "tools.dir.error",
+                        "Could not resolve or create tools directory",
+                        json!({ "error": error }),
+                    );
+                }
+            }
+            Ok(())
+        })
         .on_window_event(|_window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 log_info("app.close", "Application close requested", Value::Null);
@@ -5405,6 +5568,7 @@ pub fn run() {
             clear_app_logs,
             clear_app_cache,
             frontend_log,
+            prepare_for_update,
             audio_extract,
             audio_setup_plan,
             audio_setup,
@@ -5434,7 +5598,10 @@ pub fn run() {
             cancel_clip,
             cancel_download,
             cancel_video,
-            open_path
+            open_path,
+            tools::tools_status,
+            tools::tools_install,
+            tools::tools_cancel
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

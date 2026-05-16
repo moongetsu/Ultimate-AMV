@@ -7,7 +7,12 @@ from pathlib import Path
 
 # Ensure bundled tools (ffmpeg, ffprobe) are discoverable by audio-separator,
 # pydub, librosa, and any other library that shells out to ffmpeg via PATH.
-_tools_dir = str(Path(sys.executable).parent.parent / "tools")
+# Phase 2: the Rust shell sets ULTIMATE_AMV_TOOLS_DIR to the per-user tools
+# cache; honor that first and fall back to the legacy bundled location only
+# when the env var is missing (out-of-shell dev runs).
+_tools_dir = os.environ.get("ULTIMATE_AMV_TOOLS_DIR") or str(
+    Path(sys.executable).parent.parent / "tools"
+)
 if _tools_dir not in os.environ.get("PATH", ""):
     os.environ["PATH"] = _tools_dir + os.pathsep + os.environ.get("PATH", "")
 

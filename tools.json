@@ -1,0 +1,34 @@
+{
+  "manifest_version": 1,
+  "binaries": [
+    {
+      "name": "yt-dlp",
+      "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.03.17/yt-dlp.exe",
+      "sha256": "3db811b366b2da47337d2fcfdfe5bbd9a258dad3f350c54974f005df115a1545",
+      "size": 18448981,
+      "kind": "single",
+      "dest": "yt-dlp.exe"
+    },
+    {
+      "name": "ffmpeg-static",
+      "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-05-15-13-34/ffmpeg-N-124464-gb2867481d9-win64-gpl.zip",
+      "sha256": "c0b8d88b1736d414380a67a88f571634cbd06829f9b55f915ea88dffe4548811",
+      "size": 219013697,
+      "kind": "zip",
+      "extract": [
+        { "from": "**/bin/ffmpeg.exe", "to": "ffmpeg.exe" },
+        { "from": "**/bin/ffprobe.exe", "to": "ffprobe.exe" }
+      ]
+    },
+    {
+      "name": "ffmpeg-shared",
+      "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-05-15-13-34/ffmpeg-n8.1.1-2-gfb216b5fac-win64-gpl-shared-8.1.zip",
+      "sha256": "8e236d6b3882fc31c1e5ed71be1240361153b42aa61968e5bf9234ea48c4296e",
+      "size": 96398211,
+      "kind": "zip",
+      "extract": [
+        { "from": "**/bin/*.dll", "to_dir": "ffmpeg-shared" }
+      ]
+    }
+  ]
+}

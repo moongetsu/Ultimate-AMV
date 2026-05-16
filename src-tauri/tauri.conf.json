@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Ultimate AMV",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "identifier": "com.elishapervez.ultimateamv",
   "build": {
     "beforeDevCommand": "npm run dev -- --host 127.0.0.1",
@@ -33,18 +33,31 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis"],
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
     "resources": {
-      "../tools": "tools",
       "../python": "python",
-      "../backend": "backend"
+      "../backend": "backend",
+      "../tools.json": "tools.json"
     },
     "windows": {
       "nsis": {
         "installMode": "currentUser",
         "installerIcon": "icons/icon.ico",
         "installerHooks": "nsis-hooks.nsh"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/ElishaPervez/Ultimate-AMV/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZERkFFQkE0RDJDQjgzOTMKUldTVGc4dlNwT3Y2YmMvN0ZDV0VLY1pJbDVRekN1dXhRbnVhVytSelp3K2JSU2lWblIrc3ZUeU0K",
+      "windows": {
+        "installMode": "quiet",
+        "installerArgs": ["/NS"]
       }
     }
   }

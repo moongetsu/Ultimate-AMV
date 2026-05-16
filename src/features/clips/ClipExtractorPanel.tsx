@@ -12,6 +12,7 @@ import {
   CLIP_PREVIEW_GPU_BATCH_CONCURRENCY,
   MAX_GRID_AUTOPLAYERS,
 } from "../../lib/constants";
+import { setDiscordJob } from "../../lib/discord";
 import { logFrontend, safeLogValue } from "../../lib/log";
 import { fileName, fileStem, normalizeSelectedPaths } from "../../lib/paths";
 import { extensionAccept, useFileDrop } from "../../lib/useFileDrop";
@@ -77,6 +78,14 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     }
     wasActiveRef.current = active;
   }, [active]);
+  React.useEffect(() => {
+    setDiscordJob("Extracting clips", isExtracting);
+    return () => setDiscordJob("Extracting clips", false);
+  }, [isExtracting]);
+  React.useEffect(() => {
+    setDiscordJob("Converting clips", isConverting);
+    return () => setDiscordJob("Converting clips", false);
+  }, [isConverting]);
   const previewStatesRef = React.useRef(previewStates);
   const previewInFlightRef = React.useRef<Set<string>>(new Set());
   const previewBatchInFlightRef = React.useRef(0);

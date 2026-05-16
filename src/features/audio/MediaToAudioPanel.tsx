@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FileAudio, Upload } from "lucide-react";
+import { setDiscordJob } from "../../lib/discord";
 import { fileName, normalizeSelectedPaths } from "../../lib/paths";
 import { extensionAccept, useFileDrop } from "../../lib/useFileDrop";
 import { parseBridgePayload, readBridgeError } from "../../utils/bridge";
@@ -37,6 +38,11 @@ export function MediaToAudioPanel() {
       unlisten?.();
     };
   }, []);
+
+  React.useEffect(() => {
+    setDiscordJob("Converting audio", running);
+    return () => setDiscordJob("Converting audio", false);
+  }, [running]);
 
   function acceptFiles(paths: string[]) {
     if (paths.length === 0) return;

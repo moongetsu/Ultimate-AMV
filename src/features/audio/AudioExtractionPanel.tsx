@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { CheckCircle2, Upload } from "lucide-react";
+import { setDiscordJob } from "../../lib/discord";
 import { logFrontend, safeLogValue } from "../../lib/log";
 import { fileName, normalizeSelectedPaths } from "../../lib/paths";
 import { extensionAccept, useFileDrop } from "../../lib/useFileDrop";
@@ -43,6 +44,11 @@ export function AudioExtractionPanel() {
   React.useEffect(() => {
     void refreshStatus();
   }, []);
+
+  React.useEffect(() => {
+    setDiscordJob("Extracting vocals", extracting);
+    return () => setDiscordJob("Extracting vocals", false);
+  }, [extracting]);
 
   React.useEffect(() => {
     let unlisten: (() => void) | undefined;

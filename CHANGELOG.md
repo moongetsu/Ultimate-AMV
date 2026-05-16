@@ -5,6 +5,49 @@ All notable changes to Ultimate AMV are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] : 2026-05-16
+
+### Added
+- **Discord Rich Presence.** Optional integration that displays
+  "Playing Ultimate AMV" on your Discord profile, along with the
+  current panel (Clip Hunting, Downloader, Vocal Extraction, etc.)
+  and any running job (Extracting clips, Converting clips, Vocal
+  separation, Downloading). Toggle it on/off from
+  Settings → Discord Rich Presence. Requires the Discord desktop
+  app to be running; the integration is silent when Discord is
+  closed.
+- **Settings toggle switch.** The Discord toggle is a real
+  iOS-style switch with a sliding knob, an accent gradient track,
+  and a smooth spring animation : not a bare button labeled
+  "Disabled / Click to enable".
+
+### Changed
+- **Polished Settings action buttons.** "Choose background" and
+  "Clear cache" are now proper pill-shaped controls with subtle
+  hover lift, accent glow, and (for "Clear cache") a rose-tinted
+  danger state to signal the destructive action. The flat
+  underline style they had previously made them look like floating
+  text rather than buttons. When a background image is set, the
+  pill shows a wider thumbnail of the current image in place of
+  the icon.
+
+### Fixed
+- **Theme color state survives panel unmount.** Picking a new
+  gradient color no longer reverts to the on-disk value when you
+  navigate away from Settings and back. Theme state is now owned
+  by the shell so a still-in-flight `set_config` write can't race
+  the Settings panel's refresh.
+- **Installed-mode drift auto-heals on read.** If the stored
+  config's `setup_type` / `force_cpu` / `clip_extraction_mode`
+  drift from the actually-installed torch wheel (e.g. a crashed
+  install left "CPU configured" on top of a +cu wheel), the
+  backend silently rewrites the config to match on next
+  `show_config()`. The Settings UI no longer shows
+  "GPU installed : CPU configured" and the downloader's
+  post-download clip-server warmup uses the right mode.
+
+[0.8.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.8.0
+
 ## [0.7.4] : 2026-05-16
 
 ### Changed

@@ -1,6 +1,6 @@
 [package]
 name = "ultimate-amv-script"
-version = "0.7.4"
+version = "0.8.0"
 description = "Ultimate AMV desktop workspace"
 authors = ["ElishaPervez"]
 edition = "2021"
@@ -33,3 +33,4 @@ sha2 = "0.10"
 hex = "0.4"
 zip = { version = "4", default-features = false, features = ["deflate"] }
 futures-util = "0.3"
+discord-rich-presence = "0.2"

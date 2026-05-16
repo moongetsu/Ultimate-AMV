@@ -20,6 +20,7 @@ use tauri::async_runtime::Mutex as AsyncMutex;
 use tokio::process::{Child as AsyncChild, Command as AsyncCommand};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader as AsyncBufReader};
 
+mod discord;
 mod tools;
 
 #[derive(Clone, Serialize)]
@@ -5514,6 +5515,16 @@ fn prepare_for_update() -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn discord_set_state(state: String) {
+    discord::set_state(&state);
+}
+
+#[tauri::command]
+fn discord_clear() {
+    discord::clear();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     reset_app_logs();
@@ -5525,6 +5536,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            discord::start();
             match tools::ensure_writable_tools_dir(&app.handle()) {
                 Ok(dir) => {
                     let _ = TOOLS_DIR_OVERRIDE.set(dir.clone());
@@ -5601,7 +5613,9 @@ pub fn run() {
             open_path,
             tools::tools_status,
             tools::tools_install,
-            tools::tools_cancel
+            tools::tools_cancel,
+            discord_set_state,
+            discord_clear
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

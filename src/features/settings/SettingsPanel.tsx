@@ -1,10 +1,11 @@
 import React from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { AlertTriangle, CheckCircle2, Cpu, Image as ImageIcon, Loader2, Trash2, Zap } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Cpu, Image as ImageIcon, Loader2, MessageCircle, Trash2, Zap } from "lucide-react";
+import { isDiscordEnabled, setDiscordEnabled } from "../../lib/discord";
 import { formatBytes } from "../../lib/format";
 import { logFrontend, safeLogValue } from "../../lib/log";
-import { applyAppTheme, readThemeColors } from "../../lib/theme";
+import { applyAppTheme } from "../../lib/theme";
 import { parseBridgePayload, readBridgeError } from "../../utils/bridge";
 import type { AppConfig } from "../../types/app";
 import type { AudioSetupProgress, AudioStatus } from "../../types/audio";
@@ -20,11 +21,14 @@ function formatSetupLogLine(progress: AudioSetupProgress): string {
   return parts.join(" ");
 }
 
-export function SettingsPanel() {
+interface SettingsPanelProps {
+  themeColors: { primary: string; secondary: string };
+}
+
+export function SettingsPanel({ themeColors }: SettingsPanelProps) {
   const [backendConfig, setBackendConfig] = React.useState<AppConfig | null>(null);
   const [localClipMode, setLocalClipMode] = React.useState<"cpu" | "gpu">("gpu");
   const [localDownloadPath, setLocalDownloadPath] = React.useState("");
-  const [localThemeColors, setLocalThemeColors] = React.useState(() => readThemeColors(null));
   const [status, setStatus] = React.useState<AudioStatus | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [setupRunning, setSetupRunning] = React.useState<"cpu" | "gpu" | null>(null);
@@ -35,6 +39,13 @@ export function SettingsPanel() {
   const [clearingCache, setClearingCache] = React.useState(false);
   const [cacheNotice, setCacheNotice] = React.useState<string | null>(null);
   const [cacheError, setCacheError] = React.useState<string | null>(null);
+  const [discordEnabled, setDiscordEnabledLocal] = React.useState(isDiscordEnabled);
+
+  function toggleDiscordPresence() {
+    const next = !discordEnabled;
+    setDiscordEnabledLocal(next);
+    setDiscordEnabled(next);
+  }
 
   React.useEffect(() => {
     void refreshConfig();
@@ -73,9 +84,6 @@ export function SettingsPanel() {
       setBackendConfig(payload);
       setLocalClipMode(payload.clip_extraction_mode ?? "gpu");
       setLocalDownloadPath(payload.download_path ?? "");
-      const nextThemeColors = readThemeColors(payload);
-      setLocalThemeColors(nextThemeColors);
-      applyAppTheme(nextThemeColors);
       setError(null);
     } catch (e) {
       setError(readBridgeError(e));
@@ -156,7 +164,6 @@ export function SettingsPanel() {
   }
 
   const rawMode = backendConfig?.setup_type ?? "cpu";
-  const currentMode = rawMode;
   const hasGpu = status?.hardware.gpu_type === "nvidia";
   const settingsChecking = !status || !backendConfig;
   const gpuSetupBlocked = status ? !hasGpu : false;
@@ -167,9 +174,14 @@ export function SettingsPanel() {
     : torchVersion.includes("+cpu")
       ? "cpu"
       : null;
-  const modeMismatch = installedMode !== null && installedMode !== currentMode;
-  const gpuAllSet = currentMode === "gpu" && installedMode === "gpu" && depsReady && hasGpu;
-  const cpuAllSet = currentMode === "cpu" && installedMode === "cpu" && depsReady;
+  // The installed torch wheel is the source of truth: a successful install
+  // path always sets setup_type to match, so any drift between the stored
+  // pref and the wheel tag is a stale config (the backend self-heals this
+  // on the next show_config). Display from installedMode so the UI never
+  // contradicts the dependency status row below it.
+  const currentMode = installedMode ?? rawMode;
+  const gpuAllSet = installedMode === "gpu" && depsReady && hasGpu;
+  const cpuAllSet = installedMode === "cpu" && depsReady;
 
   return (
     <div className="settings-panel">
@@ -203,18 +215,11 @@ export function SettingsPanel() {
                       ? "Detecting engine..."
                       : "Checking..."}
                 {status ? ` · ${status.hardware.device} · ${status.hardware.provider}` : ""}
-                {modeMismatch && installedMode
-                  ? ` · configured for ${currentMode.toUpperCase()}`
-                  : ""}
               </span>
             </div>
 
             <div className="deps-badge">
-              {modeMismatch && installedMode ? (
-                <span className="deps-badge-missing">
-                  {installedMode.toUpperCase()} installed · {currentMode.toUpperCase()} configured
-                </span>
-              ) : depsReady && installedMode ? (
+              {depsReady && installedMode ? (
                 <span className="deps-badge-ready">{installedMode.toUpperCase()} READY</span>
               ) : (
                 <span className="deps-badge-missing">Not installed</span>
@@ -373,10 +378,9 @@ export function SettingsPanel() {
                 <span>Color 1</span>
                 <input
                   type="color"
-                  value={localThemeColors.primary}
+                  value={themeColors.primary}
                   onChange={(event) => {
-                    const next = { ...localThemeColors, primary: event.currentTarget.value };
-                    setLocalThemeColors(next);
+                    const next = { ...themeColors, primary: event.currentTarget.value };
                     applyAppTheme(next);
                     window.dispatchEvent(new CustomEvent("theme-changed", { detail: next }));
                     void persistConfigField("theme_color_a", next.primary);
@@ -388,10 +392,9 @@ export function SettingsPanel() {
                 <span>Color 2</span>
                 <input
                   type="color"
-                  value={localThemeColors.secondary}
+                  value={themeColors.secondary}
                   onChange={(event) => {
-                    const next = { ...localThemeColors, secondary: event.currentTarget.value };
-                    setLocalThemeColors(next);
+                    const next = { ...themeColors, secondary: event.currentTarget.value };
                     applyAppTheme(next);
                     window.dispatchEvent(new CustomEvent("theme-changed", { detail: next }));
                     void persistConfigField("theme_color_b", next.secondary);
@@ -402,7 +405,7 @@ export function SettingsPanel() {
               <div
                 className="theme-gradient-preview"
                 style={{
-                  background: `linear-gradient(120deg, ${localThemeColors.primary}, ${localThemeColors.secondary})`,
+                  background: `linear-gradient(120deg, ${themeColors.primary}, ${themeColors.secondary})`,
                 }}
                 aria-hidden="true"
               />
@@ -418,21 +421,61 @@ export function SettingsPanel() {
                   : "Replace the empty black areas of the workspace with a custom image. Opens a cropper for positioning, zoom, dim, and blur."}
               </span>
             </div>
-            <div className="bg-setting-actions">
-              {backendConfig?.background_image && (
-                <div
-                  className="bg-setting-thumb"
+            <button
+              type="button"
+              className="settings-action-pill"
+              onClick={() => window.dispatchEvent(new CustomEvent("bg-customize-open"))}
+              title={backendConfig?.background_image ? "Open the background customizer" : "Choose a background image"}
+            >
+              {backendConfig?.background_image ? (
+                <span
+                  className="settings-action-pill-thumb"
                   aria-hidden="true"
                   style={{ backgroundImage: `url("${convertFileSrc(backendConfig.background_image)}")` }}
                 />
+              ) : (
+                <span className="settings-action-pill-icon" aria-hidden="true">
+                  <ImageIcon size={16} strokeWidth={2.2} />
+                </span>
               )}
+              <span className="settings-action-pill-label">
+                {backendConfig?.background_image ? "Customize background" : "Choose background"}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div className="settings-group">
+          <div className="settings-group-header">Discord Rich Presence</div>
+          <div className="setting-row">
+            <div className="setting-info">
+              <span className="setting-label">Show activity on Discord</span>
+              <span className="setting-desc">
+                Displays &ldquo;Playing Ultimate AMV&rdquo; with the current panel or running job on your Discord profile. Requires the Discord desktop app to be running.
+              </span>
+            </div>
+            <div className="settings-toggle-wrap">
+              <span className="settings-toggle-icon" aria-hidden="true">
+                <MessageCircle size={16} strokeWidth={2.3} />
+              </span>
+              <span className={`settings-toggle-label ${discordEnabled ? "is-on" : "is-off"}`}>
+                {discordEnabled ? "Enabled" : "Disabled"}
+              </span>
               <button
                 type="button"
-                className="install-btn is-secondary"
-                onClick={() => window.dispatchEvent(new CustomEvent("bg-customize-open"))}
+                className="settings-toggle-switch"
+                role="switch"
+                aria-checked={discordEnabled}
+                aria-label="Show activity on Discord"
+                data-on={discordEnabled ? "true" : "false"}
+                onClick={toggleDiscordPresence}
+                title={discordEnabled ? "Click to hide presence on Discord" : "Click to show presence on Discord"}
               >
-                <ImageIcon size={16} strokeWidth={2.2} />
-                <span>{backendConfig?.background_image ? "Customize background" : "Choose background"}</span>
+                <span className="settings-toggle-track" aria-hidden="true">
+                  <span className="settings-toggle-track-on">ON</span>
+                  <span className="settings-toggle-track-off">OFF</span>
+                  <span className="settings-toggle-knob" />
+                </span>
               </button>
             </div>
           </div>
@@ -449,14 +492,17 @@ export function SettingsPanel() {
             </div>
             <button
               type="button"
-              className="install-btn is-secondary"
+              className="settings-action-pill is-danger"
               onClick={() => void clearCache()}
               disabled={clearingCache}
               title="Delete cached clip preview files"
             >
-              {clearingCache ? <Loader2 size={16} className="audio-spin" /> : <Trash2 size={16} strokeWidth={2.3} />}
-              <span>{clearingCache ? "Clearing..." : "Clear cache"}</span>
-              <small>{clearingCache ? "Please wait" : "Frees disk space"}</small>
+              <span className="settings-action-pill-icon" aria-hidden="true">
+                {clearingCache ? <Loader2 size={16} className="audio-spin" /> : <Trash2 size={16} strokeWidth={2.3} />}
+              </span>
+              <span className="settings-action-pill-label">
+                {clearingCache ? "Clearing..." : "Clear cache"}
+              </span>
             </button>
           </div>
           {cacheNotice && (

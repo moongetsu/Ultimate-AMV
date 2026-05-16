@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { readBackgroundState } from "../lib/background";
 import { APP_THEMES, DEFAULT_BG_STATE } from "../lib/constants";
+import { setDiscordPanel } from "../lib/discord";
 import { logFrontend, safeLogValue } from "../lib/log";
 import { applyAppTheme, isHexColor, readThemeColors } from "../lib/theme";
 import { parseBridgePayload } from "../utils/bridge";
@@ -85,6 +86,11 @@ export function App() {
   const [bgState, setBgState] = React.useState<BackgroundState>(DEFAULT_BG_STATE);
   const [bgPreview, setBgPreview] = React.useState<BackgroundState | null>(null);
   const [bgModalOpen, setBgModalOpen] = React.useState(false);
+  // Theme state lives here (not inside SettingsPanel) so it survives the
+  // Settings panel unmount/remount when the user navigates away. Otherwise
+  // SettingsPanel's refreshConfig would race the still-in-flight set_config
+  // write and re-fetch the pre-change colors from disk.
+  const [themeColors, setThemeColors] = React.useState(() => readThemeColors(null));
   const activeMeta = panelMeta[active];
   const isAudioExtraction = active === "audio-extraction";
   const isClipHunting = active === "clip-hunting";
@@ -100,11 +106,18 @@ export function App() {
   }, [liveBg.imagePath]);
 
   React.useEffect(() => {
-    applyAppTheme(readThemeColors(null));
+    setDiscordPanel(activeMeta?.title ?? "Idle");
+  }, [active, activeMeta]);
+
+  React.useEffect(() => {
+    applyAppTheme(themeColors);
+  }, [themeColors]);
+
+  React.useEffect(() => {
     invoke<string>("get_config")
       .then((raw) => {
         const payload = parseBridgePayload<AppConfig>(raw);
-        applyAppTheme(readThemeColors(payload));
+        setThemeColors(readThemeColors(payload));
         setBgState(readBackgroundState(payload));
       })
       .catch((error) => {
@@ -115,7 +128,7 @@ export function App() {
 
     const onThemeChanged = (event: Event) => {
       const colors = (event as CustomEvent<{ primary?: unknown; secondary?: unknown }>).detail;
-      applyAppTheme({
+      setThemeColors({
         primary: isHexColor(colors?.primary) ? colors.primary : APP_THEMES[0].colors[0],
         secondary: isHexColor(colors?.secondary) ? colors.secondary : APP_THEMES[0].colors[1],
       });
@@ -272,7 +285,7 @@ export function App() {
                     {isAudioConversion ? <MediaToAudioPanel />
                       : isVideoConversion ? <VideoToVideoPanel />
                         : isLogs ? <LogsPanel />
-                          : isSettings ? <SettingsPanel />
+                          : isSettings ? <SettingsPanel themeColors={themeColors} />
                             : (
                               <div className="empty-surface">
                                 <div className="surface-mark">

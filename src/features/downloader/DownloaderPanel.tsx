@@ -1,6 +1,7 @@
 import React from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { setDiscordJob } from "../../lib/discord";
 import { extractEpisodeNumber } from "../../lib/episode";
 import { logFrontend, safeLogValue } from "../../lib/log";
 import { parseBridgePayload } from "../../utils/bridge";
@@ -31,6 +32,12 @@ export function DownloaderPanel({
   React.useEffect(() => {
     void refreshDownloadHistory();
   }, []);
+
+  React.useEffect(() => {
+    const downloading = queue.some((job) => job.status === "downloading");
+    setDiscordJob("Downloading", downloading);
+    return () => setDiscordJob("Downloading", false);
+  }, [queue]);
 
   React.useEffect(() => {
     const unlisteners: Array<() => void> = [];

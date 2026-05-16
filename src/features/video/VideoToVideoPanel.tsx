@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { AlertTriangle, CheckCircle2, FileVideo, Info, Upload } from "lucide-react";
+import { setDiscordJob } from "../../lib/discord";
 import { clampNumber } from "../../lib/numbers";
 import { fileName, normalizeSelectedPaths } from "../../lib/paths";
 import { extensionAccept, useFileDrop } from "../../lib/useFileDrop";
@@ -93,6 +94,11 @@ export function VideoToVideoPanel() {
   React.useEffect(() => {
     void refreshGpuStatus();
   }, []);
+
+  React.useEffect(() => {
+    setDiscordJob("Converting video", running);
+    return () => setDiscordJob("Converting video", false);
+  }, [running]);
 
   React.useEffect(() => {
     let unlisten: (() => void) | undefined;

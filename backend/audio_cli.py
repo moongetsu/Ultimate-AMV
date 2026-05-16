@@ -87,8 +87,45 @@ def _config_payload(cfg):
     }
 
 
+def _auto_sync_install_mode(cfg):
+    # apply_success_mode() ties setup_type / force_cpu / clip_extraction_mode
+    # to the installed torch wheel, but a crashed install or a config that
+    # predates apply_success_mode can leave the stored prefs drifting from
+    # the actual install. Heal silently here so the UI doesn't show
+    # "GPU installed - CPU configured" on a +cu torch and so downstream code
+    # that reads clip_extraction_mode (e.g. DownloaderPanel's post-download
+    # clip-server warmup) sees the right mode.
+    try:
+        from importlib.metadata import version
+        torch_version = version("torch")
+    except Exception:
+        return cfg, False
+
+    if "+cu" in torch_version:
+        installed_mode = "gpu"
+    elif "+cpu" in torch_version:
+        installed_mode = "cpu"
+    else:
+        return cfg, False
+
+    changed = False
+    if cfg.get("setup_type") != installed_mode:
+        cfg["setup_type"] = installed_mode
+        changed = True
+    if cfg.get("force_cpu") != (installed_mode == "cpu"):
+        cfg["force_cpu"] = installed_mode == "cpu"
+        changed = True
+    if cfg.get("clip_extraction_mode") != installed_mode:
+        cfg["clip_extraction_mode"] = installed_mode
+        changed = True
+    return cfg, changed
+
+
 def show_config():
     cfg = load_config()
+    cfg, changed = _auto_sync_install_mode(cfg)
+    if changed:
+        save_config(cfg)
     emit(_config_payload(cfg))
 
 

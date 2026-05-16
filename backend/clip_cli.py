@@ -500,7 +500,7 @@ def extract_gpu(input_path, info, threshold, min_clip_seconds, batch_frames, ove
     ffmpeg = require_tool("ffmpeg")
     progress("probe", 1, f"{info.codec} at {info.fps:.3f} FPS, {info.duration:.1f}s", started_at)
 
-    # Preload TransNetV2 on a background thread while NVDEC decodes — they use different GPU resources
+    # Preload TransNetV2 on a background thread while NVDEC decodes : they use different GPU resources
     _preload: dict = {}
     def _load_model():
         try:

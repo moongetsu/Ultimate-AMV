@@ -391,7 +391,7 @@ fn tools_dir_path(root: &Path) -> PathBuf {
     if let Ok(env_dir) = std::env::var("ULTIMATE_AMV_TOOLS_DIR") {
         return PathBuf::from(env_dir);
     }
-    // Dev fallback only — when running from a checkout that still has a
+    // Dev fallback only : when running from a checkout that still has a
     // local tools/ tree for legacy reasons, this lets `cargo run` work
     // before the gate has populated app_local_data_dir/tools/.
     root.join("tools")
@@ -5306,7 +5306,7 @@ async fn cancel_clip(window: tauri::Window) {
 
     // The persistent clip server runs nelux/torchcodec native code that can
     // hang in C++ on unsupported codecs without ever raising. The one-shot
-    // PID kill above doesn't touch this child — we must stop it explicitly
+    // PID kill above doesn't touch this child : we must stop it explicitly
     // so the next extraction starts on a fresh process instead of writing
     // to a stuck stdin.
     if let Some(mutex) = CLIP_SERVER.get() {
@@ -5360,7 +5360,7 @@ fn open_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
 
 // Assign the current process to a Windows Job Object configured with
 // JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE so every Python sidecar we spawn
-// dies automatically when this process exits — even on TerminateProcess
+// dies automatically when this process exits : even on TerminateProcess
 // (which the installer uses) or an unexpected crash, where the normal
 // CloseRequested handler does not run. Without this, orphaned python.exe
 // children keep _bz2.pyd / *.dll handles open and the next installer
@@ -5411,7 +5411,7 @@ fn setup_kill_on_close_job() {
             // fallback; not fatal.
             log_warn(
                 "app.jobobject.assign.error",
-                "Could not assign main process to job object — relying on close-event cleanup",
+                "Could not assign main process to job object : relying on close-event cleanup",
                 json!({ "error": error.to_string() }),
             );
             let _ = CloseHandle(job);
@@ -5420,7 +5420,7 @@ fn setup_kill_on_close_job() {
 
         log_info(
             "app.jobobject.ready",
-            "Job object assigned — Python sidecars will auto-terminate with the main process",
+            "Job object assigned : Python sidecars will auto-terminate with the main process",
             Value::Null,
         );
         // Save the raw handle so prepare_for_update can drop
@@ -5441,14 +5441,14 @@ fn setup_kill_on_close_job() {
 //
 //  1. Kill the Python sidecars synchronously. install() is going to exit
 //     the main exe via TerminateProcess, which does NOT fire our
-//     CloseRequested handler — so the children would otherwise survive
+//     CloseRequested handler : so the children would otherwise survive
 //     long enough to hold _bz2.pyd / python.exe handles open while NSIS
 //     tries to overwrite them.
 //
 //  2. Drop JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE from the job. The installer
 //     is spawned as a child of this process and therefore inherits the
 //     job. When we exit, the kernel closes our last handle to the job,
-//     and KILL_ON_JOB_CLOSE would terminate the installer mid-install —
+//     and KILL_ON_JOB_CLOSE would terminate the installer mid-install :
 //     leaving the user stuck on the old version (no update applied, no
 //     auto-relaunch, no error). Clearing the flag lets the installer
 //     outlive us.
@@ -5456,7 +5456,7 @@ fn setup_kill_on_close_job() {
 fn prepare_for_update() -> Result<(), String> {
     log_info(
         "updater.prepare.start",
-        "Preparing for auto-update — killing sidecars and relaxing job object",
+        "Preparing for auto-update : killing sidecars and relaxing job object",
         Value::Null,
     );
     kill_child_pid(&AUDIO_CHILD_PID);
@@ -5481,7 +5481,7 @@ fn prepare_for_update() -> Result<(), String> {
         let Some(&raw) = JOB_HANDLE_RAW.get() else {
             log_warn(
                 "updater.prepare.no_job",
-                "No saved job handle — installer should survive anyway",
+                "No saved job handle : installer should survive anyway",
                 Value::Null,
             );
             return Ok(());
@@ -5499,13 +5499,13 @@ fn prepare_for_update() -> Result<(), String> {
         ) {
             log_warn(
                 "updater.prepare.relax_failed",
-                "Could not clear KILL_ON_JOB_CLOSE — installer may be killed at exit",
+                "Could not clear KILL_ON_JOB_CLOSE : installer may be killed at exit",
                 json!({ "error": error.to_string() }),
             );
         } else {
             log_info(
                 "updater.prepare.relaxed",
-                "Cleared KILL_ON_JOB_CLOSE — installer will survive process exit",
+                "Cleared KILL_ON_JOB_CLOSE : installer will survive process exit",
                 Value::Null,
             );
         }

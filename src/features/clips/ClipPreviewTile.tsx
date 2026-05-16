@@ -2,7 +2,7 @@ import React from "react";
 import { CheckCircle2, Circle } from "lucide-react";
 import type { ClipPreviewItem, ClipVideoRange } from "../../types/clip";
 
-// Currently dead code — see FINDINGS.md. Moved here unchanged during the
+// Currently dead code : see FINDINGS.md. Moved here unchanged during the
 // main.tsx split to keep that work move-only.
 function sourceClipPlaybackRange(clip: ClipPreviewItem): ClipVideoRange {
   const safeFps = Number.isFinite(clip.fps) && clip.fps > 0 ? clip.fps : 24;

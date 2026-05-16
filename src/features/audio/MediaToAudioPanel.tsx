@@ -117,7 +117,7 @@ export function MediaToAudioPanel() {
       <div className="drop-zone-overlay">
         <Upload size={32} strokeWidth={1.8} />
         <span>Drop media to convert to {format.toUpperCase()}</span>
-        <small>Audio or video — batches are queued together</small>
+        <small>Audio or video : batches are queued together</small>
       </div>
       <div className="conversion-hero">
         <div>

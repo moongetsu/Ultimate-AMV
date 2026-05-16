@@ -130,7 +130,7 @@ export function YoutubeTrimEditor({
                 playsInline
                 onTimeUpdate={() => setPlayerCurrentTime(readCurrentTime())}
                 onSeeked={() => setPlayerCurrentTime(readCurrentTime())}
-                onError={() => setPreviewError("Could not load preview stream — type timestamps manually below.")}
+                onError={() => setPreviewError("Could not load preview stream : type timestamps manually below.")}
               />
             ) : (
               <div className="youtube-trim-frame-fallback">

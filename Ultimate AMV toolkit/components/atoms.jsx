@@ -193,7 +193,7 @@ function Waveform({ seed = 1, color = "var(--text-2)", active = 0, total = 1, he
   );
 }
 
-// Cover placeholder — striped bg with title
+// Cover placeholder : striped bg with title
 function CoverPlaceholder({ seed = 1, label, ep }) {
   const hue = (seed * 47) % 360;
   return (

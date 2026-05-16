@@ -101,7 +101,7 @@ def get_cpu_switch_cmds(
 ):
     cmds = []
     # See get_gpu_switch_cmds for why only the opposite runtime is
-    # pre-uninstalled here — torch is swapped in-place via --force-reinstall.
+    # pre-uninstalled here : torch is swapped in-place via --force-reinstall.
     if cleanup_gpu_runtime:
         uninstall_cmd = _get_uninstall_cmd(["onnxruntime-gpu"])
         if uninstall_cmd:

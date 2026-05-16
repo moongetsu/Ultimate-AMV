@@ -15,7 +15,7 @@ Thumbs.db
 desktop.ini
 
 # Logs and temporary files. `logs/` is anchored so it doesn't shadow
-# src/features/logs/ — the rule below already covers backend/logs/.
+# src/features/logs/ : the rule below already covers backend/logs/.
 *.log
 /logs/
 tmp/
@@ -52,7 +52,7 @@ downloads/
 output/
 outputs/
 exports/
-# Anchored — the runtime clip output dir lives at the project root, but
+# Anchored : the runtime clip output dir lives at the project root, but
 # src/features/clips/ holds source code and must stay tracked.
 /clips/
 episodes/

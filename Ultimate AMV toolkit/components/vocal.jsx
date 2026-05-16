@@ -70,7 +70,7 @@ function VocalExtraction({ tweaks }) {
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 12, color: "var(--text-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  Yoasobi — Idol (TV size).flac
+                  Yoasobi : Idol (TV size).flac
                 </div>
                 <div className="mono" style={{ fontSize: 10, color: "var(--text-3)", marginTop: 2 }}>
                   44.1 kHz · 24-bit · 03:38 · 38.2 MB
@@ -85,7 +85,7 @@ function VocalExtraction({ tweaks }) {
             <div className="field">
               <label>Architecture</label>
               <select className="select" defaultValue="kim">
-                <option value="kim">Kim Vocal 2 — MDX-Net</option>
+                <option value="kim">Kim Vocal 2 : MDX-Net</option>
                 <option value="uvr">UVR-MDX-NET Voc FT</option>
                 <option value="htdemucs">HTDemucs (4-stem)</option>
                 <option value="mel">Mel-RoFormer (slow)</option>
@@ -171,7 +171,7 @@ function IdleCanvas() {
             Drop an audio or video file
           </div>
           <div style={{ fontSize: 12, color: "var(--text-3)" }}>
-            WAV · FLAC · MP3 · OGG · M4A · MP4 · MKV — up to 30 minutes
+            WAV · FLAC · MP3 · OGG · M4A · MP4 · MKV : up to 30 minutes
           </div>
         </div>
         <div className="row" style={{ gap: 8 }}>
@@ -204,7 +204,7 @@ function ExtractCanvas({ progress, stage }) {
       {/* Now-playing card */}
       <div className="card" style={{ overflow: "hidden" }}>
         <div className="card-h">
-          <h3>Yoasobi — Idol (TV size).flac</h3>
+          <h3>Yoasobi : Idol (TV size).flac</h3>
           <span className="chip mono" style={{ marginLeft: 8 }}>03:38</span>
           <span className="chip mono">44.1 kHz</span>
           <span className="chip mono">stereo</span>
@@ -257,21 +257,21 @@ function ExtractCanvas({ progress, stage }) {
           </div>
         </div>
         <QueueRow
-          name="Yoasobi — Idol (TV size).flac"
+          name="Yoasobi : Idol (TV size).flac"
           status={stage === "complete" ? "done" : "processing"}
           progress={progress}
           eta={stage === "complete" ? "Saved" : "00:42 left"}
           model="Kim Vocal 2"
         />
         <QueueRow
-          name="Lilas Ikuta — Wandering.wav"
+          name="Lilas Ikuta : Wandering.wav"
           status="queued"
           progress={0}
           eta="queued"
           model="Kim Vocal 2"
         />
         <QueueRow
-          name="Aimer — Zankyosanka.mp3"
+          name="Aimer : Zankyosanka.mp3"
           status="queued"
           progress={0}
           eta="queued"
@@ -295,7 +295,7 @@ function ExtractCanvas({ progress, stage }) {
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, color: "var(--text-0)", fontWeight: 600 }}>Extraction complete</div>
               <div className="mono" style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
-                vocals.flac · instrumental.flac — 76.4 MB · 1m 12s · D:\amv\stems\Idol\
+                vocals.flac · instrumental.flac : 76.4 MB · 1m 12s · D:\amv\stems\Idol\
               </div>
             </div>
             <button className="btn">Reveal in folder</button>
@@ -384,12 +384,12 @@ function QueueRow({ name, status, progress, eta, model }) {
 
 function HistoryView() {
   const rows = [
-    { name: "Yoasobi — Idol (TV size).flac", date: "2026-04-12 21:09", model: "Kim Vocal 2", dur: "1m 12s", size: "76 MB" },
-    { name: "Aimer — Zankyosanka.wav", date: "2026-04-11 18:42", model: "Kim Vocal 2", dur: "1m 04s", size: "82 MB" },
-    { name: "Lilas Ikuta — Wandering.wav", date: "2026-04-09 14:05", model: "HTDemucs", dur: "2m 48s", size: "164 MB" },
-    { name: "Eve — Kaikai Kitan.mp3", date: "2026-04-08 09:22", model: "UVR-MDX-NET", dur: "0m 58s", size: "48 MB" },
-    { name: "Mrs. Green Apple — Inferno.flac", date: "2026-04-06 23:14", model: "Kim Vocal 2", dur: "1m 22s", size: "94 MB" },
-    { name: "Radwimps — Sparkle.flac", date: "2026-04-04 11:02", model: "Mel-RoFormer", dur: "3m 41s", size: "121 MB" },
+    { name: "Yoasobi : Idol (TV size).flac", date: "2026-04-12 21:09", model: "Kim Vocal 2", dur: "1m 12s", size: "76 MB" },
+    { name: "Aimer : Zankyosanka.wav", date: "2026-04-11 18:42", model: "Kim Vocal 2", dur: "1m 04s", size: "82 MB" },
+    { name: "Lilas Ikuta : Wandering.wav", date: "2026-04-09 14:05", model: "HTDemucs", dur: "2m 48s", size: "164 MB" },
+    { name: "Eve : Kaikai Kitan.mp3", date: "2026-04-08 09:22", model: "UVR-MDX-NET", dur: "0m 58s", size: "48 MB" },
+    { name: "Mrs. Green Apple : Inferno.flac", date: "2026-04-06 23:14", model: "Kim Vocal 2", dur: "1m 22s", size: "94 MB" },
+    { name: "Radwimps : Sparkle.flac", date: "2026-04-04 11:02", model: "Mel-RoFormer", dur: "3m 41s", size: "121 MB" },
   ];
   return (
     <div style={{ flex: 1, padding: 20, overflow: "auto" }}>

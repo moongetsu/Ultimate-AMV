@@ -54,7 +54,7 @@ export function DepInstallCard({
         >
           <Zap size={16} strokeWidth={2.3} />
           <span>Install GPU mode</span>
-          <small>{hasGpu ? "CUDA 12.8 — faster" : "Compatible GPU not found"}</small>
+          <small>{hasGpu ? "CUDA 12.8 : faster" : "Compatible GPU not found"}</small>
         </button>
 
         <button
@@ -64,7 +64,7 @@ export function DepInstallCard({
         >
           <Cpu size={16} strokeWidth={2.3} />
           <span>Install CPU only</span>
-          <small>{hasGpu ? "Skip GPU — works anywhere" : "Recommended"}</small>
+          <small>{hasGpu ? "Skip GPU : works anywhere" : "Recommended"}</small>
         </button>
       </div>
     </section>

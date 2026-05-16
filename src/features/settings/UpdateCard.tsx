@@ -111,14 +111,14 @@ export function UpdateCard() {
       logFrontend("info", "updater.install.start", "Applying update; app will exit");
       // Drop KILL_ON_JOB_CLOSE on the Windows Job Object and kill Python
       // sidecars BEFORE the installer spawns. Without this, install()'s
-      // child installer inherits our job and dies the instant we exit —
+      // child installer inherits our job and dies the instant we exit :
       // the user stays on the old version with no error.
       await invoke<void>("prepare_for_update").catch((error) => {
         logFrontend("warn", "updater.prepare.failed", "prepare_for_update failed; install may not survive", {
           error: safeLogValue(error),
         });
       });
-      // install() blocks and never returns on Windows — the installer terminates
+      // install() blocks and never returns on Windows : the installer terminates
       // the running process and relaunches the new build via the /R flag.
       void handle.install();
     } catch (error) {
@@ -174,7 +174,7 @@ export function UpdateCard() {
         <div className="settings-setup-status">
           <Loader2 size={16} className="audio-spin" />
           <span>
-            Downloading v{state.version} — {progressPercent(state.received, state.total)}%
+            Downloading v{state.version} : {progressPercent(state.received, state.total)}%
             {state.total > 0
               ? ` (${formatBytes(state.received)} / ${formatBytes(state.total)})`
               : state.received > 0

@@ -10,7 +10,7 @@ import { ToolsGate } from "../features/setup/ToolsGate";
 import { App } from "./App";
 
 export function Root() {
-  // The tools gate runs before any other startup work — ffmpeg/ffprobe/yt-dlp
+  // The tools gate runs before any other startup work : ffmpeg/ffprobe/yt-dlp
   // are no longer bundled (Phase 2), and downstream code (audio bridge config
   // load, clip server warmup) assumes the bundled-tool paths are populated.
   const [toolsReady, setToolsReady] = React.useState<boolean>(false);

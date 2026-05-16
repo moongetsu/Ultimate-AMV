@@ -5798,7 +5798,7 @@ button {
   }
 }
 
-/* Episode label modal — surfaces when the network sniffer downloads a
+/* Episode label modal : surfaces when the network sniffer downloads a
    stream we couldn't auto-identify, so the user can pick an existing
    anime folder (autocomplete) or save anywhere on disk. */
 .episode-label-backdrop {
@@ -6072,7 +6072,7 @@ button {
   box-shadow: none;
 }
 
-/* Clip extractor compatibility-convert modal — reuses .episode-label-* shell. */
+/* Clip extractor compatibility-convert modal : reuses .episode-label-* shell. */
 .clip-compat-status {
   display: flex;
   align-items: center;
@@ -6118,7 +6118,7 @@ button {
   border: 1px solid rgb(var(--theme-accent-rgb) / 0.28);
 }
 
-/* Drag-and-drop zones — hover indicator while the OS is holding files
+/* Drag-and-drop zones : hover indicator while the OS is holding files
    over a region wired up via useFileDrop. The overlay is pointer-events:
    none so it never swallows the underlying click. */
 .drop-zone {

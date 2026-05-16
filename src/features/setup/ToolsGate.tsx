@@ -51,7 +51,7 @@ const STAGE_LABEL: Record<BinaryProgress["state"], string> = {
 };
 
 function formatBytes(value: number | null): string {
-  if (value == null || !Number.isFinite(value) || value <= 0) return "—";
+  if (value == null || !Number.isFinite(value) || value <= 0) return ":";
   const units = ["B", "KB", "MB", "GB"];
   let v = value;
   let i = 0;
@@ -284,7 +284,7 @@ export function ToolsGate({ onReady }: { onReady: () => void }) {
         </h2>
         <p>
           {isInstalling
-            ? "Downloading FFmpeg, ffprobe, yt-dlp, and the shared FFmpeg DLLs nelux needs. This is a one-time setup — future updates will be tiny."
+            ? "Downloading FFmpeg, ffprobe, yt-dlp, and the shared FFmpeg DLLs nelux needs. This is a one-time setup : future updates will be tiny."
             : phase === "error"
               ? "The download was interrupted. Check your network and try again. Partial files were cleaned up."
               : "Ultimate AMV needs to download FFmpeg / ffprobe / yt-dlp / nelux DLLs (about 200 MB) into a per-user cache. This is a one-time setup."}

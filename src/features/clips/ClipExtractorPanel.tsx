@@ -36,7 +36,7 @@ import { ClipCompatConvertModal } from "./ClipCompatConvertModal";
 import { ClipPreviewScroller } from "./ClipPreviewScroller";
 import { ClipPreviewTile } from "./ClipPreviewTile";
 
-// Currently dead code — see FINDINGS.md. Moved here unchanged during the
+// Currently dead code : see FINDINGS.md. Moved here unchanged during the
 // main.tsx split to keep that work move-only.
 void readClipAudioSettings;
 void writeClipAudioSettings;
@@ -442,7 +442,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     const videos = overrideVideos ?? selectedVideos;
     if (videos.length === 0 || isExtracting) return;
 
-    // Preflight codec check — only the GPU path is codec-fragile. nelux+NVDEC
+    // Preflight codec check : only the GPU path is codec-fragile. nelux+NVDEC
     // can hang in native code on anything outside the supported set; CPU mode
     // goes through ffmpeg directly and handles every codec ffmpeg knows.
     if (clipMode === "gpu") {
@@ -452,7 +452,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
           failedPath: unsupported.path,
           failedIndex: unsupported.index,
           rawError: unsupported.codec === "unknown"
-            ? `Couldn't read this file's metadata — it may be corrupted or use an exotic container. Convert it to a compatible format to try again.`
+            ? `Couldn't read this file's metadata : it may be corrupted or use an exotic container. Convert it to a compatible format to try again.`
             : `Codec "${unsupported.codec}" isn't supported by the GPU clip extractor. Only H.264, HEVC, and AV1 work directly on the GPU path. Convert to a compatible format, or switch the clip extractor to CPU mode in Settings.`,
         });
         return;
@@ -819,7 +819,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
       <div className="drop-zone-overlay">
         <Upload size={32} strokeWidth={1.8} />
         <span>Drop video(s) to scan for clips</span>
-        <small>MP4 · MKV · MOV · WEBM · AVI — multiple files accepted</small>
+        <small>MP4 · MKV · MOV · WEBM · AVI : multiple files accepted</small>
       </div>
       <div className="clip-extractor-rail">
         <button type="button" className="clip-import-button" onClick={pickVideo}>
@@ -1136,7 +1136,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
 }
 
 // nelux+NVDEC reliably decodes only these codecs. Anything else either errors
-// out or hangs in native code without raising — so we refuse the GPU path
+// out or hangs in native code without raising : so we refuse the GPU path
 // upfront and prompt the user to convert. Keep this list in sync with
 // cuvid_decoder() in backend/clip_cli.py.
 const GPU_SUPPORTED_CODECS = new Set(["h264", "hevc", "av1"]);

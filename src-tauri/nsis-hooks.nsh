@@ -4,7 +4,7 @@
 ; of Section Install, BEFORE the CheckIfAppIsRunning macro and BEFORE any
 ; File copy. We use it to make sure no Python sidecar (clip server, audio
 ; worker) is still holding python\python.exe / _bz2.pyd / FFmpeg DLLs
-; open — otherwise NSIS fails the file overwrite with "Error opening file
+; open : otherwise NSIS fails the file overwrite with "Error opening file
 ; for writing" on update.
 ;
 ; The main exe also pins itself to a Windows Job Object with

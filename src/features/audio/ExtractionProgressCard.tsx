@@ -6,9 +6,9 @@ function stageHeading(stage: string, percent: number): string {
     case "loading":
       return "Loading AI model";
     case "model-download":
-      return percent >= 0 ? `Downloading AI model — ${percent}%` : "Downloading AI model";
+      return percent >= 0 ? `Downloading AI model : ${percent}%` : "Downloading AI model";
     case "processing":
-      return percent >= 0 ? `Extracting vocals — ${percent}%` : "Extracting vocals";
+      return percent >= 0 ? `Extracting vocals : ${percent}%` : "Extracting vocals";
     case "finalizing":
       return "Saving stems";
     case "complete":

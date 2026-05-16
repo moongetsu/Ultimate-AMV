@@ -181,8 +181,8 @@ export function SetupWizard({ onComplete }: Props) {
                   <span className="setup-mode-name">GPU mode (CUDA 12.8)</span>
                   <span className="setup-mode-desc">
                     {hardware.hasNvidiaGpu
-                      ? `Uses ${hardware.gpuName ?? "your NVIDIA GPU"} — faster, downloads ~3 GB`
-                      : "Requires an NVIDIA GPU — not detected on this machine"}
+                      ? `Uses ${hardware.gpuName ?? "your NVIDIA GPU"} : faster, downloads ~3 GB`
+                      : "Requires an NVIDIA GPU : not detected on this machine"}
                   </span>
                 </div>
               </label>
@@ -198,7 +198,7 @@ export function SetupWizard({ onComplete }: Props) {
                 <div>
                   <span className="setup-mode-name">CPU mode</span>
                   <span className="setup-mode-desc">
-                    Works on any machine — slower, downloads ~200 MB
+                    Works on any machine : slower, downloads ~200 MB
                   </span>
                 </div>
               </label>
@@ -275,7 +275,7 @@ export function SetupWizard({ onComplete }: Props) {
                   <Loader2 size={16} className="audio-spin" />
                   <span>
                     {progress
-                      ? `Step ${Math.min(progress.step, progress.total)} / ${progress.total} — ${progress.message}`
+                      ? `Step ${Math.min(progress.step, progress.total)} / ${progress.total} : ${progress.message}`
                       : "Starting..."}
                   </span>
                 </div>

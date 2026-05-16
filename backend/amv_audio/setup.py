@@ -33,7 +33,7 @@ def _nelux_importable():
     #      app_local_data_dir/tools/, so the probe must consult the
     #      ULTIMATE_AMV_TOOLS_DIR env var first (set by the Rust shell)
     #      and fall back to the legacy path only for out-of-shell dev runs.
-    #   2. torch must be imported first — nelux 0.10+'s __init__.py raises
+    #   2. torch must be imported first : nelux 0.10+'s __init__.py raises
     #      `ImportError: PyTorch must be imported before Nelux.` otherwise.
     # The probe below mirrors both pre-conditions before attempting the
     # import, so a healthy install does not trip the repair gate.
@@ -98,7 +98,7 @@ def _installed_torch_mode():
     # making the repair gate fire on every update with the misleading
     # "Install PyTorch with CUDA 12.8" issue. The readiness check already
     # gates on check_nvidia_gpu(), so a +cu wheel on a CPU-only host is
-    # still caught — just by the right signal.
+    # still caught : just by the right signal.
     try:
         from importlib.metadata import version
         torch_version = version("torch")

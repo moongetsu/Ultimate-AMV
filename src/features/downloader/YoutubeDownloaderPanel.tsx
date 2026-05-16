@@ -147,7 +147,7 @@ export function YoutubeDownloaderPanel({
         ? `${payload.formats.length} formats found.`
         : "Best (auto-merge) is ready.";
       const durationLine = duration ? ` Duration: ${formatHms(duration, false)}.` : "";
-      const liveLine = payload.isLive ? " Live stream — clipping disabled." : "";
+      const liveLine = payload.isLive ? " Live stream : clipping disabled." : "";
       setMessage(`${formatLine}${durationLine}${liveLine}`);
     } catch (formatError) {
       setError(String(formatError));
@@ -265,7 +265,7 @@ export function YoutubeDownloaderPanel({
       ) : isLive ? (
         <div className="youtube-trim-disabled">
           <Scissors size={14} strokeWidth={2.1} />
-          <span>Live streams cannot be clipped — yt-dlp does not support sections on live URLs.</span>
+          <span>Live streams cannot be clipped : yt-dlp does not support sections on live URLs.</span>
         </div>
       ) : null}
 

@@ -62,7 +62,7 @@ $entries = @(
         Select-Object -Unique PSPath, DisplayName, InstallLocation, UninstallString, QuietUninstallString
 )
 
-# Discover candidate install dirs BEFORE running the uninstaller — we need
+# Discover candidate install dirs BEFORE running the uninstaller : we need
 # them to filter the python.exe kill below. We accept either an explicit
 # InstallLocation registry value or the directory containing the
 # (Quiet)UninstallString exe.
@@ -83,7 +83,7 @@ $installDirs = @(
 # Kill any Python sidecars whose ImagePath sits inside an install dir.
 # Pre-0.4.1 builds did not pin children to a Job Object, so a bare
 # `taskkill /f /im ultimate-amv-script.exe` leaves orphan clip-server /
-# audio-worker processes alive — they hold python\python.exe and
+# audio-worker processes alive : they hold python\python.exe and
 # python\_bz2.pyd open, NSIS's Delete fails silently, and Remove-Item
 # below leaves stragglers behind. Filtering by ImagePath means we only
 # touch *our* python.exes, never the user's other Python installs.
@@ -167,7 +167,7 @@ foreach ($root in $uninstallRoots) {
     }
 }
 
-# Verification pass — fail loudly if anything we tried to remove is still
+# Verification pass : fail loudly if anything we tried to remove is still
 # there. $ErrorActionPreference = SilentlyContinue would otherwise swallow
 # the Delete / Remove-Item failures that happen when a file is still held
 # open (the exact symptom we're trying to fix). Returning a non-zero exit

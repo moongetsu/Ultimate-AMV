@@ -114,7 +114,7 @@ export function EpisodeLabelModal({
         setCustomDir(selected);
       }
     } catch {
-      // User cancelled or picker failed — leave state untouched.
+      // User cancelled or picker failed : leave state untouched.
     }
   }
 
@@ -151,7 +151,7 @@ export function EpisodeLabelModal({
             <p>
               {customDir
                 ? "Using a custom folder. Episode number still determines the filename."
-                : "We couldn't auto-detect this one. Pick an existing series or type a new name — and confirm the episode number."}
+                : "We couldn't auto-detect this one. Pick an existing series or type a new name : and confirm the episode number."}
             </p>
           </div>
           <button type="button" className="episode-label-close" onClick={onCancel} aria-label="Cancel">

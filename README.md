@@ -4,7 +4,7 @@
 
 # Ultimate AMV
 
-A Windows desktop app for building anime music video edits. It handles the full workflow in one place — browsing and downloading source footage, separating audio, extracting clips, and exporting the final cut.
+A Windows desktop app for building anime music video edits. It handles the full workflow in one place : browsing and downloading source footage, separating audio, extracting clips, and exporting the final cut.
 
 <p align="center">
   <a href="https://discord.gg/kXqYrERSP">
@@ -17,11 +17,11 @@ A Windows desktop app for building anime music video edits. It handles the full 
 ## Features
 
 - **Built-in browser** with automatic episode and series detection on anime streaming sites
-- **Audio separation** — split any track into vocals and instrumentals using ML models, with CPU and NVIDIA GPU (CUDA) support
-- **Clip extraction** — frame-accurate trimming and export via ffmpeg, with GPU-accelerated decoding where available
-- **Download manager** — grab footage directly from streaming sites via a bundled yt-dlp integration
-- **Self-contained setup** — a first-run wizard installs all ML dependencies (PyTorch, audio-separator, ONNX Runtime) into a bundled Python environment, no manual setup required
-- **Custom themes** — preset colour schemes plus full hex colour customisation
+- **Audio separation** : split any track into vocals and instrumentals using ML models, with CPU and NVIDIA GPU (CUDA) support
+- **Clip extraction** : frame-accurate trimming and export via ffmpeg, with GPU-accelerated decoding where available
+- **Download manager** : grab footage directly from streaming sites via a bundled yt-dlp integration
+- **Self-contained setup** : a first-run wizard installs all ML dependencies (PyTorch, audio-separator, ONNX Runtime) into a bundled Python environment, no manual setup required
+- **Custom themes** : preset colour schemes plus full hex colour customisation
 
 ---
 
@@ -35,7 +35,7 @@ A Windows desktop app for building anime music video edits. It handles the full 
 
 ## Installation
 
-Download the latest installer from the [Releases](../../releases) page and run it. No admin rights required — it installs per-user by default.
+Download the latest installer from the [Releases](../../releases) page and run it. No admin rights required : it installs per-user by default.
 
 On first launch, open **Settings** and run the setup wizard to install the audio and clip processing backends. The wizard handles everything automatically.
 

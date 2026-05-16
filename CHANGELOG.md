@@ -5,14 +5,14 @@ All notable changes to Ultimate AMV are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.4] — 2026-05-16
+## [0.7.4] : 2026-05-16
 
 ### Changed
 - Throwaway version to validate the 0.7.3 startup toast in action.
 
 [0.7.4]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.7.4
 
-## [0.7.3] — 2026-05-16
+## [0.7.3] : 2026-05-16
 
 ### Added
 - **Startup update check + top-right toast.** The app now silently pings
@@ -26,19 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Update card collapses to a single button.** "Download" and "Restart
   to apply update" merged into one "Download and install update"
   action. Click it once and the app downloads the new installer,
-  silently applies it, and restarts on its own — no second prompt.
+  silently applies it, and restarts on its own : no second prompt.
 
 [0.7.3]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.7.3
 [0.7.2]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.7.2
 
-## [0.7.0] — 2026-05-16
+## [0.7.0] : 2026-05-16
 
 ### Added
 - **Silent in-app auto-updater.** Settings now has an "App Updates" card
   at the top showing the current version and a "Check for updates"
   button that polls the GitHub release feed. When a newer version is
   found, the release notes are previewed inline and a single click
-  downloads the new installer in the background — keep the app open and
+  downloads the new installer in the background : keep the app open and
   use it normally while it downloads. When ready, the button changes to
   "Restart to apply update": clicking it quits the app, runs the new
   installer silently (no wizard, no prompts), and relaunches the new
@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tools" gate downloads them (about 200 MB total) into a per-user
   cache at `%LOCALAPPDATA%\com.elishapervez.ultimateamv\tools\` and
   verifies every binary against a pinned SHA256 from `tools.json`.
-  This is a one-time cost — subsequent auto-updates only ship the app
+  This is a one-time cost : subsequent auto-updates only ship the app
   code and apply in seconds. The cache lives outside the install
   directory, so reinstalls and uninstalls don't disturb it.
 - **`tools_status`, `tools_install`, `tools_cancel` Tauri commands**
@@ -77,12 +77,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Installer is now ~30 MB instead of ~185 MB.** FFmpeg, ffprobe,
   yt-dlp, and the shared FFmpeg DLLs no longer ship inside the NSIS
-  installer — see the tools-download gate above.
+  installer : see the tools-download gate above.
 - **Tool versions are pinned in `tools.json` at the repo root.**
   Bumping a binary is a manifest change + matching SHA256 update.
   Current pins: yt-dlp 2026.03.17, FFmpeg static
   `autobuild-2026-05-15-13-34` (master, GPL), FFmpeg shared DLLs
-  `autobuild-2026-05-15-13-34` (n8.1 branch — the avcodec-62 ABI
+  `autobuild-2026-05-15-13-34` (n8.1 branch : the avcodec-62 ABI
   nelux is built against).
 - **CI no longer downloads FFmpeg / yt-dlp** during the release
   build. `.github/workflows/release.yml` drops three binary-fetch
@@ -93,16 +93,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.7.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.7.0
 
-## [0.6.0] — 2026-05-16
+## [0.6.0] : 2026-05-16
 
 ### Added
 - **Custom URL provider for anime downloads.** The provider dropdown in
   the Anime Download panel now has a third option, "Custom URL", that
   unlocks the address bar so you can point the built-in browser at any
-  anime site — not just AniKai or AniWaves. Enter a URL and press Enter
+  anime site : not just AniKai or AniWaves. Enter a URL and press Enter
   (or click Go) to load it. Host-restricted navigation is disabled in
   custom mode, so the page can navigate freely within whatever site
-  you pointed it at. The stream sniffer still works the same — open an
+  you pointed it at. The stream sniffer still works the same : open an
   episode, hit play, and the captured stream lands in the queue.
 - **Provider selection persists across sessions.** The selected
   provider (preset or custom URL) is saved to config and restored on
@@ -119,13 +119,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   while the modal is open and snaps back in place when it closes.
 - **Browser page no longer disappears after confirming the modal.** A
   follow-on regression where the WebView would stay parked off-screen
-  after the modal dismissed — Tauri's child WebView needs a multi-attempt
+  after the modal dismissed : Tauri's child WebView needs a multi-attempt
   position/size sync plus a one-pixel resize nudge to reliably redraw
   after being moved. The lifecycle effect now fires that exact sequence
   on modal close, so the page restores the moment you confirm the
   episode.
 
-## [0.5.0] — 2026-05-14
+## [0.5.0] : 2026-05-14
 
 ### Added
 - **Unsupported-codec auto-convert for the GPU clip extractor.** Dropping a
@@ -150,29 +150,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decode_accelerator="nvdec")`, which only supports H.264 / HEVC / AV1
   in hardware. On anything else (ProRes, DNxHR, VP9, exotic MKV
   builds), nelux would hang inside native C++ code without ever raising
-  a Python exception or emitting an error event — leaving the UI stuck
+  a Python exception or emitting an error event : leaving the UI stuck
   at "Decoding at 8000+ FPS with Nelux Ultimate..." at 1% with no way
   to recover short of killing the app. The frontend now runs a
   ~50 ms ffprobe codec check before dispatching to the GPU path; if
   the codec isn't in the supported whitelist (sourced from
   `cuvid_decoder()` in `backend/clip_cli.py`), the convert modal opens
   immediately with the codec named in plain language. CPU mode skips
-  this check entirely — PySceneDetect pipes through ffmpeg directly
+  this check entirely : PySceneDetect pipes through ffmpeg directly
   and handles every codec ffmpeg knows.
 - **Cancel actually cancels GPU clip extractions now.** The previous
   `cancel_clip` only killed the one-shot child process; the persistent
   clip server (which runs nelux's native code) was a separate
   AsyncChild that the cancel never touched, so a hung server would
   stay hung and the next extraction would dispatch to the same wedged
-  stdin. Cancel now stops both — the one-shot PID and the persistent
-  `CLIP_SERVER` AsyncChild — and emits a synthetic `stopped` event so
+  stdin. Cancel now stops both : the one-shot PID and the persistent
+  `CLIP_SERVER` AsyncChild : and emits a synthetic `stopped` event so
   the warmup automatically respawns a fresh server for the next run.
   The Cancel button on the frontend also breaks out of the awaited
   `clip-server-event` listener via an abort ref, which previously
   waited indefinitely for a `done`/`error` event that never came after
   a cancel.
 
-## [0.4.1] — 2026-05-14
+## [0.4.1] : 2026-05-14
 
 ### Fixed
 - **Updates no longer fail with "Error opening file for writing" when
@@ -181,7 +181,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   holding `_bz2.pyd` / FFmpeg DLLs open, blocking the file copy. The
   main process now pins itself to a Windows Job Object with
   `KILL_ON_JOB_CLOSE` so sidecars die automatically the moment the
-  main exe exits — for any reason, including the installer's hard
+  main exe exits : for any reason, including the installer's hard
   terminate. A new NSIS pre-install hook also runs
   `taskkill /F /T` on the whole tree as a belt-and-suspenders pass.
   Result: closing the app first is no longer required to update.
@@ -200,7 +200,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (reinstall)" even though the DLLs were correct and Repair could
   never fix the underlying issue.
 - **Clip extractor warmup no longer fails with the nelux FFmpeg DLL
-  load error.** Same root cause as above — with the bundler fix in
+  load error.** Same root cause as above : with the bundler fix in
   place, `tools/ffmpeg-shared/*.dll` end up at the path nelux expects.
 - **Engine Repair never leaves the install worse than it found it on
   network failure.** Torch is now swapped via a single
@@ -214,7 +214,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   call (or got killed mid-uninstall by a setup flow), the install
   ended up with mismatched torch/torchvision wheels and a cryptic
   `operator torchvision::nms does not exist` error from the next
-  separation. The auto-repair on warmup is gone — dependencies are
+  separation. The auto-repair on warmup is gone : dependencies are
   installed once during the setup wizard / Repair, and the clip
   server now trusts that they're correct.
 - **Clip preview progress bar no longer drifts out of sync with the
@@ -229,21 +229,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   visible tile so both the progress bar and the WebP restart from frame
   0 in lockstep. The bar (a fresh DOM element) already restarted
   cleanly, but Chromium was serving the WebP from its decoded image
-  cache and the animation continued mid-cycle — bar at 0%, WebP at
+  cache and the animation continued mid-cycle : bar at 0%, WebP at
   frame ~50. The img src now cache-busts on each activation so the
   browser re-decodes from scratch.
 
 ### Changed
 - **PyTorch CPU/GPU mode is detected from the wheel's local tag
   (`+cu128` / `+cpu`) rather than a subprocess `torch.cuda.is_available()`
-  probe at startup.** The probe was flaky on cold boots — driver not
-  fully resident yet, first-import past the 10s timeout — and would
+  probe at startup.** The probe was flaky on cold boots : driver not
+  fully resident yet, first-import past the 10s timeout : and would
   silently demote a working `+cu` install to "cpu", which itself
   tripped the repair gate. `nvidia-smi` still gates whether GPU setup
   is offered, so a `+cu` wheel on a CPU-only host is caught by the
   right signal.
 
-## [0.4.0] — 2026-05-11
+## [0.4.0] : 2026-05-11
 
 ### Added
 - **Drag-and-drop files anywhere they're accepted.** Drop video or
@@ -253,8 +253,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   files shows a clear drop target so you know it'll catch.
 - **Custom save folder per AniKai download.** When the sniffer catches
   a stream we couldn't auto-name, a labeling prompt asks for the anime
-  title and episode number — with autocomplete over folders you've
-  already used — and lets you optionally save into any folder on disk
+  title and episode number : with autocomplete over folders you've
+  already used : and lets you optionally save into any folder on disk
   instead of the default `<downloads>/<anime>` layout.
 
 ### Changed
@@ -263,18 +263,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   feature folder (`src/shell/`, `src/features/{audio,clips,downloader,
   logs,settings,video}/`, `src/lib/`, `src/types/`). One component per
   file, no barrel files, shared helpers consolidated into `src/lib/`.
-  Behavior is identical — this is purely a maintainability upgrade
+  Behavior is identical : this is purely a maintainability upgrade
   that makes future features cheaper to add and easier to review.
 - **Background cropper can be opened by clicking it.** The empty frame
   is now a click-or-Enter target in addition to the "Pick an image"
-  button — matches the new drop behavior.
+  button : matches the new drop behavior.
 
 ### Removed
 - **Dead `AnimeBrowser` panel** and the 5 unused helpers + 2 unused
   types + 6 stale lucide imports that came with it. Nothing was
   rendering it; confirmed dead before deleting.
 
-## [0.3.0] — 2026-05-10
+## [0.3.0] : 2026-05-10
 
 ### Added
 - **Setup wizard now picks a download folder.** A new "Folder" step sits
@@ -291,10 +291,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   plus seek buttons already cover the same flow, so the extra buttons were
   just noise.
 
-## [0.2.0] — 2026-05-09
+## [0.2.0] : 2026-05-09
 
 ### Added
-- **Custom background image** with a built-in cropper — drag to position,
+- **Custom background image** with a built-in cropper : drag to position,
   scroll to zoom, dim and blur sliders. The image bleeds through every
   workspace area without hurting text legibility.
 - **Custom theme colors.** Two-color accent gradient with five presets
@@ -313,7 +313,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   than config alone, surfacing any mismatch with a one-click Switch to
   reconcile.
 
-## [0.1.0] — 2026-05-09
+## [0.1.0] : 2026-05-09
 
 ### Added
 - Initial release.

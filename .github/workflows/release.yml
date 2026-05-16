@@ -81,12 +81,12 @@ jobs:
         run: |
           $version = "${{ github.ref_name }}".TrimStart("v")
           $changelog = Get-Content CHANGELOG.md -Raw
-          # Match "## [VERSION] — ..." up to the next "## [" header or the
+          # Match "## [VERSION] : ..." up to the next "## [" header or the
           # link reference block at the bottom (lines starting with "[X.Y.Z]:").
           $pattern = "(?ms)^## \[$([regex]::Escape($version))\][^\n]*\n.*?(?=^## \[|^\[\d+\.\d+\.\d+\]:)"
           $match = [regex]::Match($changelog, $pattern)
           if (-not $match.Success) {
-            Write-Error "No CHANGELOG section found for $version. Add a '## [$version] — YYYY-MM-DD' block before tagging."
+            Write-Error "No CHANGELOG section found for $version. Add a '## [$version] : YYYY-MM-DD' block before tagging."
             exit 1
           }
           $match.Value.TrimEnd() | Out-File -FilePath release-notes.md -Encoding utf8

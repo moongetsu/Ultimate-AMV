@@ -260,7 +260,7 @@ export function SettingsPanel() {
             >
               <Zap size={16} strokeWidth={2.3} />
               <span>{settingsChecking ? "Checking GPU" : gpuAllSet ? "GPU ready" : "Switch to GPU"}</span>
-              <small>{settingsChecking ? "Please wait" : gpuAllSet ? "Already set up" : hasGpu ? "CUDA 12.8 — faster" : "Compatible GPU not found"}</small>
+              <small>{settingsChecking ? "Please wait" : gpuAllSet ? "Already set up" : hasGpu ? "CUDA 12.8 : faster" : "Compatible GPU not found"}</small>
             </button>
 
             <button
@@ -272,7 +272,7 @@ export function SettingsPanel() {
             >
               <Cpu size={16} strokeWidth={2.3} />
               <span>{settingsChecking ? "Checking CPU" : cpuAllSet ? "CPU ready" : "Switch to CPU"}</span>
-              <small>{settingsChecking ? "Please wait" : cpuAllSet ? "Already set up" : hasGpu ? "Fallback — works anywhere" : "Recommended"}</small>
+              <small>{settingsChecking ? "Please wait" : cpuAllSet ? "Already set up" : hasGpu ? "Fallback : works anywhere" : "Recommended"}</small>
             </button>
           </div>
 
@@ -280,7 +280,7 @@ export function SettingsPanel() {
             <div className="settings-setup-status">
               <Loader2 size={16} className="audio-spin" />
               <span>
-                Installing {setupRunning === "gpu" ? "GPU" : "CPU"} engine{setupProgress ? ` — step ${setupProgress.step}/${setupProgress.total}` : ""}
+                Installing {setupRunning === "gpu" ? "GPU" : "CPU"} engine{setupProgress ? ` : step ${setupProgress.step}/${setupProgress.total}` : ""}
               </span>
             </div>
           )}

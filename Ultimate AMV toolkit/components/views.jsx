@@ -63,7 +63,7 @@ function ClipHunting() {
             </div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
               <div className="row" style={{ gap: 10 }}>
-                <h2 style={{ margin: 0, fontSize: 15, color: "var(--text-0)", fontWeight: 600 }}>S02E07 — A Dance with Dogs</h2>
+                <h2 style={{ margin: 0, fontSize: 15, color: "var(--text-0)", fontWeight: 600 }}>S02E07 : A Dance with Dogs</h2>
                 <span className="chip mono">23:41</span>
                 <span className="chip mono">1080p</span>
                 <span className="chip good"><Ic.check width="11" height="11" /> 247 scenes</span>
@@ -470,7 +470,7 @@ function VideoConversion() {
               <select className="select" defaultValue="prores">
                 <option value="prores">ProRes 422 LT (editor-ready)</option>
                 <option value="dnx">DNxHR LB</option>
-                <option value="h264">H.264 — high quality</option>
+                <option value="h264">H.264 : high quality</option>
                 <option value="h265">H.265 NVENC</option>
               </select>
             </div>
@@ -535,7 +535,7 @@ function Library() {
   const titles = [
     "Frieren: Beyond Journey's End", "Spy × Family", "Jujutsu Kaisen", "Vinland Saga",
     "Bocchi the Rock!", "Chainsaw Man", "Mob Psycho 100", "Cyberpunk: Edgerunners",
-    "Demon Slayer", "Made in Abyss", "Violet Evergarden", "86 — Eighty Six",
+    "Demon Slayer", "Made in Abyss", "Violet Evergarden", "86 : Eighty Six",
     "Oshi no Ko", "Kaiju No. 8", "Solo Leveling", "Apothecary Diaries",
   ];
   return (
@@ -543,7 +543,7 @@ function Library() {
       <div className="ws-header">
         <div className="ws-title">
           <h1>Library</h1>
-          <span className="sub">Browse, queue and download episodes — all from inside the app.</span>
+          <span className="sub">Browse, queue and download episodes : all from inside the app.</span>
         </div>
         <div className="ws-actions">
           <div className="row" style={{
@@ -593,9 +593,9 @@ function Library() {
 
 function Downloads() {
   const items = [
-    { name: "Frieren S01E12 — The Land Where Souls Rest", status: "active", progress: 0.47, size: "1.4 GB", speed: "12.4 MB/s" },
-    { name: "Spy × Family S02E07 — A Dance with Dogs", status: "active", progress: 0.82, size: "1.1 GB", speed: "8.9 MB/s" },
-    { name: "Bocchi the Rock! S01E08", status: "queued", progress: 0, size: "—", speed: "—" },
+    { name: "Frieren S01E12 : The Land Where Souls Rest", status: "active", progress: 0.47, size: "1.4 GB", speed: "12.4 MB/s" },
+    { name: "Spy × Family S02E07 : A Dance with Dogs", status: "active", progress: 0.82, size: "1.1 GB", speed: "8.9 MB/s" },
+    { name: "Bocchi the Rock! S01E08", status: "queued", progress: 0, size: ":", speed: ":" },
     { name: "Vinland Saga S02E22", status: "done", progress: 1, size: "1.6 GB", speed: "saved" },
     { name: "Cyberpunk: Edgerunners E04", status: "done", progress: 1, size: "1.3 GB", speed: "saved" },
   ];
@@ -708,7 +708,7 @@ function Settings() {
               <div className="card">
                 <div className="card-h"><h3>Storage</h3></div>
                 <div style={{ padding: 16 }}>
-                  <div className="mono" style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 8 }}>D:\amv\ — 412 GB used / 2.0 TB</div>
+                  <div className="mono" style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 8 }}>D:\amv\ : 412 GB used / 2.0 TB</div>
                   <div style={{ height: 8, background: "var(--bg-3)", borderRadius: 4, overflow: "hidden", display: "flex" }}>
                     <span style={{ width: "32%", background: "var(--accent)" }} />
                     <span style={{ width: "12%", background: "oklch(0.7 0.15 280)" }} />
@@ -736,7 +736,7 @@ function LogsView() {
     ["INFO", "10:32:14.701", "extractor", "starting job idol_tv_size.flac (218.4s)"],
     ["DEBUG", "10:32:14.712", "decoder", "ffmpeg pipe 44100/2/s24le ok"],
     ["DEBUG", "10:32:15.022", "extractor", "chunk 0 / 27 done in 244ms"],
-    ["WARN", "10:32:18.402", "loudness", "input peaking +0.4 dBTP — clipping risk"],
+    ["WARN", "10:32:18.402", "loudness", "input peaking +0.4 dBTP : clipping risk"],
     ["DEBUG", "10:32:21.110", "extractor", "chunk 12 / 27 done in 218ms"],
     ["INFO", "10:32:38.901", "writer", "wrote vocals.flac (38.1 MB)"],
     ["INFO", "10:32:39.812", "writer", "wrote instrumental.flac (38.3 MB)"],

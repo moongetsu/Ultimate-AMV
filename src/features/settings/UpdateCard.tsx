@@ -133,7 +133,7 @@ export function UpdateCard() {
   const versionLabel = currentVersion ? `v${currentVersion}` : "unknown";
 
   return (
-    <div className="settings-group">
+    <div className="settings-group glass">
       <div className="settings-group-header">App Updates</div>
 
       <div className="setting-row deps-row">

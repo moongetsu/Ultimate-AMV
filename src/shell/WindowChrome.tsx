@@ -29,6 +29,7 @@ export function WindowChrome() {
       <div className="window-controls">
         <button
           type="button"
+          className="spring-motion"
           aria-label="Minimize"
           onClick={() => withWindow((appWindow) => appWindow.minimize())}
         >
@@ -36,6 +37,7 @@ export function WindowChrome() {
         </button>
         <button
           type="button"
+          className="spring-motion"
           aria-label="Maximize"
           onClick={() => withWindow((appWindow) => appWindow.toggleMaximize())}
         >
@@ -43,7 +45,7 @@ export function WindowChrome() {
         </button>
         <button
           type="button"
-          className="close-window"
+          className="close-window spring-motion"
           aria-label="Close"
           onClick={() => withWindow((appWindow) => appWindow.close())}
         >

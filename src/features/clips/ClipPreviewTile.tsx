@@ -1,6 +1,7 @@
 import React from "react";
 import { CheckCircle2, Circle } from "lucide-react";
 import type { ClipPreviewItem, ClipVideoRange } from "../../types/clip";
+import { CLIP_HOVER_PREVIEW_KEY } from "../../lib/constants";
 
 // Currently dead code : see FINDINGS.md. Moved here unchanged during the
 // main.tsx split to keep that work move-only.
@@ -48,8 +49,32 @@ export function ClipPreviewTile({
   onClick: () => void;
   onToggleSelect: () => void;
 }) {
+  const [hoverPlayOnly, setHoverPlayOnly] = React.useState<boolean>(() => {
+    try {
+      return localStorage.getItem(CLIP_HOVER_PREVIEW_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [isHovered, setIsHovered] = React.useState(false);
+
+  React.useEffect(() => {
+    const handlePrefChanged = () => {
+      try {
+        setHoverPlayOnly(localStorage.getItem(CLIP_HOVER_PREVIEW_KEY) === "true");
+      } catch {
+        // Safe fallback
+      }
+    };
+    window.addEventListener("clip-hover-preview-changed", handlePrefChanged);
+    return () => {
+      window.removeEventListener("clip-hover-preview-changed", handlePrefChanged);
+    };
+  }, []);
+
   const previewRange = previewClipPlaybackRange(clip);
-  const shouldPlay = Boolean(previewRange) && playable && !paused;
+  const isPlayActive = !hoverPlayOnly || isHovered;
+  const shouldPlay = Boolean(previewRange) && playable && !paused && isPlayActive;
   const placeholderLoading = playable && clip.previewState?.status !== "error";
   const loopDuration = previewRange
     ? Math.max(0.45, previewRange.end - previewRange.start)
@@ -61,10 +86,14 @@ export function ClipPreviewTile({
   }, [previewRange?.src, activationEpoch]);
 
   return (
-    <div className={`clip-preview-tile-wrapper ${selected ? "is-selected" : ""}`}>
+    <div
+      className={`clip-preview-tile-wrapper ${selected ? "is-selected" : ""}`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <button
         type="button"
-        className={`clip-preview-tile ${selected ? "is-selected" : ""} ${mergeMode ? "is-selectable" : ""}`}
+        className={`clip-preview-tile spring-motion ${selected ? "is-selected" : ""} ${mergeMode ? "is-selectable" : ""}`}
         onClick={onClick}
       >
         {shouldPlay && previewRange ? (
@@ -106,7 +135,7 @@ export function ClipPreviewTile({
       </button>
       <button
         type="button"
-        className={`clip-corner-select ${selected ? "is-selected" : ""} ${mergeMode && mergePosition != null ? "is-merge" : ""}`}
+        className={`clip-corner-select spring-motion ${selected ? "is-selected" : ""} ${mergeMode && mergePosition != null ? "is-merge" : ""}`}
         onClick={(e) => {
           e.stopPropagation();
           onToggleSelect();

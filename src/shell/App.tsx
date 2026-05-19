@@ -102,8 +102,15 @@ export function App() {
 
   const liveBg = bgPreview ?? bgState;
   React.useEffect(() => {
-    document.documentElement.classList.toggle("has-app-bg", Boolean(liveBg.imagePath));
-  }, [liveBg.imagePath]);
+    const root = document.documentElement;
+    const hasImage = Boolean(liveBg.imagePath);
+    root.classList.toggle("has-app-bg", hasImage);
+    if (hasImage) {
+      root.style.setProperty("--app-bg-blur", `${Math.max(0, liveBg.blur)}px`);
+    } else {
+      root.style.removeProperty("--app-bg-blur");
+    }
+  }, [liveBg.imagePath, liveBg.blur]);
 
   React.useEffect(() => {
     setDiscordPanel(activeMeta?.title ?? "Idle");
@@ -184,20 +191,20 @@ export function App() {
         />
       )}
       <section className={`app-shell ${expanded ? "is-expanded" : "is-compact"}`}>
-        <aside className="sidebar" aria-label="Primary navigation">
+        <aside className="sidebar glass-strong" aria-label="Primary navigation">
           <div className="brand-strip">
             <button
               type="button"
-              className="icon-button collapse-button"
+              className="icon-button collapse-button spring-motion"
               aria-label={expanded ? "Compact sidebar" : "Expand sidebar"}
               onClick={() => setExpanded((value) => !value)}
             >
-              {expanded ? <ChevronsLeft size={19} /> : <ChevronsRight size={19} />}
+              {expanded ? <ChevronsLeft size={19} strokeWidth={2.5} /> : <ChevronsRight size={19} strokeWidth={2.5} />}
             </button>
             <div className="brand-cluster">
               <div className="brand-copy">
                 <span className="brand-name">Ultimate AMV</span>
-                <span className="brand-subtitle">Editor workspace</span>
+                <span className="brand-subtitle">Creative Engine</span>
               </div>
             </div>
           </div>
@@ -217,22 +224,22 @@ export function App() {
           <div className="sidebar-footer">
             <button
               type="button"
-              className={`settings-button ${active === "logs" ? "is-active" : ""}`}
+              className={`settings-button spring-motion ${active === "logs" ? "is-active" : ""}`}
               aria-label="Logs"
               onClick={() => setActive("logs")}
             >
               <ScrollText size={21} strokeWidth={2.05} />
-              <span>Logs</span>
+              <span>System Logs</span>
             </button>
 
             <button
               type="button"
-              className={`settings-button ${active === "settings" ? "is-active" : ""}`}
+              className={`settings-button spring-motion ${active === "settings" ? "is-active" : ""}`}
               aria-label="Settings"
               onClick={() => setActive("settings")}
             >
               <Settings size={22} strokeWidth={2.15} />
-              <span>Settings</span>
+              <span>Engine Settings</span>
             </button>
           </div>
         </aside>
@@ -240,13 +247,13 @@ export function App() {
         <section className="workspace">
           <div className="canvas">
             <div className="canvas-grid" aria-hidden="true" />
-            <div className="focus-panel">
+            <div className="focus-panel glass">
               <div className="mode-switcher" aria-label="Workspace mode">
                 {modeTabs.map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
-                    className={`mode-tab ${isAudioExtraction
+                    className={`mode-tab spring-motion ${isAudioExtraction
                         ? "is-active"
                         : isDownloader
                           ? downloaderTab === tab.id
@@ -271,24 +278,24 @@ export function App() {
                 ))}
               </div>
               <div className="panel-body">
-                <div className={`panel-view ${isClipHunting ? "is-active" : "is-hidden"}`} aria-hidden={!isClipHunting}>
+                <div className={`panel-view spring-motion ${isClipHunting ? "is-active" : "is-hidden"}`} aria-hidden={!isClipHunting}>
                   <ClipExtractorPanel active={isClipHunting} />
                 </div>
-                <div className={`panel-view ${isDownloader ? "is-active" : "is-hidden"}`} aria-hidden={!isDownloader}>
+                <div className={`panel-view spring-motion ${isDownloader ? "is-active" : "is-hidden"}`} aria-hidden={!isDownloader}>
                   <DownloaderPanel active={isDownloader} activeTab={downloaderTab} sidebarExpanded={expanded} />
                 </div>
-                <div className={`panel-view ${isAudioExtraction ? "is-active" : "is-hidden"}`} aria-hidden={!isAudioExtraction}>
+                <div className={`panel-view spring-motion ${isAudioExtraction ? "is-active" : "is-hidden"}`} aria-hidden={!isAudioExtraction}>
                   <AudioExtractionPanel />
                 </div>
                 {!isClipHunting && !isDownloader && !isAudioExtraction && (
-                  <div className="panel-view is-active">
+                  <div className="panel-view is-active spring-motion">
                     {isAudioConversion ? <MediaToAudioPanel />
                       : isVideoConversion ? <VideoToVideoPanel />
                         : isLogs ? <LogsPanel />
                           : isSettings ? <SettingsPanel themeColors={themeColors} />
                             : (
                               <div className="empty-surface">
-                                <div className="surface-mark">
+                                <div className="surface-mark accent-glow">
                                   <FolderKanban size={34} strokeWidth={1.8} />
                                 </div>
                                 <h2>{activeMeta.title}</h2>

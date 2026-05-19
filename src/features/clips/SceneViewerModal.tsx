@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import {
   AlertTriangle,
@@ -214,7 +215,7 @@ export function SceneViewerModal({
 
   const progress = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
 
-  return (
+  return createPortal(
     <div
       className="episode-label-backdrop scene-viewer-backdrop"
       role="dialog"
@@ -331,6 +332,7 @@ export function SceneViewerModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { CheckCircle2, FolderOpen, Hash, Sparkles, Tv, X } from "lucide-react";
@@ -139,7 +140,7 @@ export function EpisodeLabelModal({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="episode-label-backdrop" role="dialog" aria-label="Confirm episode details">
       <div className="episode-label-modal">
         <div className="episode-label-header">
@@ -263,6 +264,7 @@ export function EpisodeLabelModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

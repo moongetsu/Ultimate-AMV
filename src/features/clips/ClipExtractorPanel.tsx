@@ -2,7 +2,7 @@ import React from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowRight, CheckCircle2, Clapperboard, Film, Info, Loader2, Scissors, Upload, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clapperboard, Film, Info, Loader2, Scissors, Upload, X, Zap } from "lucide-react";
 import { Virtuoso } from "react-virtuoso";
 import {
   CLIP_AUDIO_SETTINGS_KEY,
@@ -11,6 +11,7 @@ import {
   CLIP_PREVIEW_CPU_BATCH_CONCURRENCY,
   CLIP_PREVIEW_GPU_BATCH_CONCURRENCY,
   MAX_GRID_AUTOPLAYERS,
+  CLIP_HOVER_PREVIEW_KEY,
 } from "../../lib/constants";
 import { setDiscordJob } from "../../lib/discord";
 import { logFrontend, safeLogValue } from "../../lib/log";
@@ -32,8 +33,10 @@ import type {
   ClipProgress,
   ClipScene,
 } from "../../types/clip";
-import type { ConversionDone, VideoGpuStatus } from "../../types/conversion";
+import type { ConversionProgress, VideoGpuStatus } from "../../types/conversion";
 import { ClipCompatConvertModal } from "./ClipCompatConvertModal";
+import { ClipExportProgressModal } from "./ClipExportProgressModal";
+import type { ClipExportRow, ClipExportSession } from "./ClipExportProgressModal";
 import { ClipPreviewScroller } from "./ClipPreviewScroller";
 import { ClipPreviewTile } from "./ClipPreviewTile";
 import { SceneViewerModal } from "./SceneViewerModal";
@@ -48,6 +51,27 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   const [selectedVideos, setSelectedVideos] = React.useState<string[]>([]);
   const [clipMode, setClipMode] = React.useState<"cpu" | "gpu">("gpu");
   const [gridPreview, setGridPreview] = React.useState(true);
+  const [hoverPlayOnly, setHoverPlayOnly] = React.useState<boolean>(() => {
+    try {
+      return localStorage.getItem(CLIP_HOVER_PREVIEW_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  React.useEffect(() => {
+    const handlePrefChanged = () => {
+      try {
+        setHoverPlayOnly(localStorage.getItem(CLIP_HOVER_PREVIEW_KEY) === "true");
+      } catch {
+        // Safe fallback
+      }
+    };
+    window.addEventListener("clip-hover-preview-changed", handlePrefChanged);
+    return () => {
+      window.removeEventListener("clip-hover-preview-changed", handlePrefChanged);
+    };
+  }, []);
   const [gridCols, setGridCols] = React.useState(4);
   const [mergeMode, setMergeMode] = React.useState(false);
   const [mergeOrder, setMergeOrder] = React.useState<string[]>([]);
@@ -73,6 +97,11 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   const [clipModeLoaded, setClipModeLoaded] = React.useState(false);
   const [activationEpoch, setActivationEpoch] = React.useState(0);
   const [viewerClip, setViewerClip] = React.useState<ClipPreviewItem | null>(null);
+  const [exportSession, setExportSession] = React.useState<ClipExportSession | null>(null);
+  const exportSessionRef = React.useRef<ClipExportSession | null>(null);
+  React.useEffect(() => {
+    exportSessionRef.current = exportSession;
+  }, [exportSession]);
 
   // Bump activationEpoch when the viewer closes so the grid's WebPs and CSS
   // progress bars re-key together and resync. Otherwise both keep running in
@@ -162,6 +191,51 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
       if (!cancelled) {
         setProgress(mapClipBatchProgress(event.payload, clipBatchProgressRef.current));
       }
+    }).then((cleanup) => {
+      if (cancelled) {
+        cleanup();
+      } else {
+        unlisten = cleanup;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    let unlisten: (() => void) | null = null;
+    void listen<ConversionProgress>("conversion-progress", (event) => {
+      if (cancelled) return;
+      const payload = event.payload;
+      // Route to the export modal when an export session is active so the
+      // per-clip bar and overall bar both reflect real ffmpeg progress.
+      // Otherwise fall through to the legacy inline progress card that the
+      // codec-conversion path still uses.
+      if (exportSessionRef.current) {
+        const percent = typeof payload.percent === "number" ? payload.percent : 0;
+        setExportSession((current) =>
+          current
+            ? {
+                ...current,
+                activePercent: Math.max(0, Math.min(100, percent)),
+                activeFps: payload.fps ?? current.activeFps,
+                activeSpeed: payload.speed ?? current.activeSpeed,
+                activeMessage: payload.message || current.activeMessage,
+              }
+            : current,
+        );
+        return;
+      }
+      setProgress({
+        type: "progress",
+        stage: payload.stage,
+        percent: typeof payload.percent === "number" ? payload.percent : 0,
+        message: payload.message + (payload.speed ? ` (${payload.speed})` : ""),
+      });
     }).then((cleanup) => {
       if (cancelled) {
         cleanup();
@@ -740,34 +814,83 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
       fps: clip.fps,
     }));
 
-    setIsExtracting(true);
     setError(null);
-    setProgress({
-      type: "progress",
-      stage: "starting",
-      percent: 0,
-      message: `Merging ${exportClips.length} clips into ${mergeFilenameStem}.mov...`,
+    setIsExtracting(true);
+    const mergeRow: ClipExportRow = {
+      id: `merge-${mergeFilenameStem}`,
+      label: `${mergeFilenameStem}.mov`,
+      range: `${mergeOrderedClips.length} clips`,
+      status: "active",
+    };
+    setExportSession({
+      mode: "merge",
+      rows: [mergeRow],
+      activeIndex: 0,
+      activePercent: 0,
+      activeFps: null,
+      activeSpeed: null,
+      activeMessage: `Merging ${exportClips.length} clips into ${mergeFilenameStem}.mov...`,
+      phase: "running",
+      outputDir: selected,
     });
 
+    let cancelled = false;
+    let failed = false;
+    let errorText: string | null = null;
+
     try {
-      const raw = await invoke<string>("clip_export_merged", {
+      await invoke<string>("clip_export_merged", {
         clips: exportClips,
         outputDir: selected,
         preset: exportFormat,
       });
-      const payload = parseBridgePayload<ConversionDone>(raw);
-      setProgress({
-        type: "progress",
-        stage: "complete",
-        percent: 100,
-        message: `Merged clip saved to ${payload.output}`,
-      });
-      setMergeOrder([]);
-      setMergeMode(false);
+      setExportSession((current) =>
+        current
+          ? {
+              ...current,
+              activePercent: 100,
+              rows: current.rows.map((row, idx) =>
+                idx === 0 ? { ...row, status: "done" } : row,
+              ),
+            }
+          : current,
+      );
     } catch (e) {
-      setError(readBridgeError(e));
-      setProgress(null);
+      if (clipCancellingRef.current) {
+        cancelled = true;
+      } else {
+        failed = true;
+        errorText = readBridgeError(e);
+      }
+      setExportSession((current) =>
+        current
+          ? {
+              ...current,
+              rows: current.rows.map((row, idx) =>
+                idx === 0
+                  ? {
+                      ...row,
+                      status: cancelled ? "cancelled" : "error",
+                      errorMessage: errorText ?? row.errorMessage,
+                    }
+                  : row,
+              ),
+            }
+          : current,
+      );
     } finally {
+      const finalPhase = cancelled ? "cancelled" : failed ? "error" : "complete";
+      setExportSession((current) =>
+        current ? { ...current, phase: finalPhase } : current,
+      );
+      if (!cancelled && !failed) {
+        setMergeOrder([]);
+        setMergeMode(false);
+      }
+      if (failed && errorText) {
+        setError(errorText);
+      }
+      clipCancellingRef.current = false;
       setIsExtracting(false);
     }
   }
@@ -788,43 +911,140 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     if (!selected || Array.isArray(selected)) return;
 
     const outDir = selected;
-    const exportClips = clips
-      .filter((clip) => selectedClipIds.has(clip.id))
-      .map((clip, index) => ({
-        source: clip.path,
-        start: clip.sourceStart,
-        end: clip.sourceEnd,
-        index: index,
-        fps: clip.fps,
-      }));
+    const selectedClips = clips.filter((clip) => selectedClipIds.has(clip.id));
+    if (selectedClips.length === 0) return;
 
-    setIsExtracting(true);
-    setProgress({
-      type: "progress",
-      stage: "starting",
-      percent: 0,
-      message: `Preparing to export ${exportClips.length} clips...`,
-    });
+    const rows: ClipExportRow[] = selectedClips.map((clip) => ({
+      id: clip.id,
+      label: clip.label,
+      range: clip.range,
+      status: "pending",
+    }));
+
     setError(null);
+    setIsExtracting(true);
+    setExportSession({
+      mode: "single",
+      rows,
+      activeIndex: 0,
+      activePercent: 0,
+      activeFps: null,
+      activeSpeed: null,
+      activeMessage: null,
+      phase: "running",
+      outputDir: outDir,
+    });
+
+    let cancelled = false;
+    let failed = false;
+    let firstError: string | null = null;
 
     try {
-      const raw = await invoke<string>("clip_export", {
-        clips: exportClips,
-        outputDir: outDir,
-        preset: exportFormat,
-      });
-      const payload = parseBridgePayload<ConversionDone>(raw);
-      setProgress({
-        type: "progress",
-        stage: "complete",
-        percent: 100,
-        message: `Exported ${exportClips.length} clips to ${payload.output}`,
-      });
-      setSelectedClipIds(new Set());
-    } catch (e) {
-      setError(readBridgeError(e));
-      setProgress(null);
+      for (let index = 0; index < selectedClips.length; index += 1) {
+        if (clipCancellingRef.current) {
+          cancelled = true;
+          break;
+        }
+        const clip = selectedClips[index];
+        setExportSession((current) =>
+          current
+            ? {
+                ...current,
+                activeIndex: index,
+                activePercent: 0,
+                activeFps: null,
+                activeSpeed: null,
+                activeMessage: null,
+                rows: current.rows.map((row, rowIdx) =>
+                  rowIdx === index ? { ...row, status: "active" } : row,
+                ),
+              }
+            : current,
+        );
+
+        try {
+          await invoke<string>("clip_export", {
+            clips: [
+              {
+                source: clip.path,
+                start: clip.sourceStart,
+                end: clip.sourceEnd,
+                index,
+                fps: clip.fps,
+              },
+            ],
+            outputDir: outDir,
+            preset: exportFormat,
+          });
+          setExportSession((current) =>
+            current
+              ? {
+                  ...current,
+                  activePercent: 100,
+                  rows: current.rows.map((row, rowIdx) =>
+                    rowIdx === index ? { ...row, status: "done" } : row,
+                  ),
+                }
+              : current,
+          );
+        } catch (e) {
+          if (clipCancellingRef.current) {
+            cancelled = true;
+            setExportSession((current) =>
+              current
+                ? {
+                    ...current,
+                    rows: current.rows.map((row, rowIdx) =>
+                      rowIdx === index ? { ...row, status: "cancelled" } : row,
+                    ),
+                  }
+                : current,
+            );
+            break;
+          }
+          failed = true;
+          const errorText = readBridgeError(e);
+          if (!firstError) firstError = errorText;
+          setExportSession((current) =>
+            current
+              ? {
+                  ...current,
+                  rows: current.rows.map((row, rowIdx) =>
+                    rowIdx === index
+                      ? { ...row, status: "error", errorMessage: errorText }
+                      : row,
+                  ),
+                }
+              : current,
+          );
+        }
+      }
     } finally {
+      const finalPhase = cancelled
+        ? "cancelled"
+        : failed
+          ? "error"
+          : "complete";
+      setExportSession((current) =>
+        current
+          ? {
+              ...current,
+              phase: finalPhase,
+              rows: current.rows.map((row) =>
+                row.status === "pending"
+                  ? { ...row, status: cancelled ? "cancelled" : row.status }
+                  : row,
+              ),
+            }
+          : current,
+      );
+      if (!cancelled && !failed) {
+        setSelectedClipIds(new Set());
+      }
+      if (failed && firstError) {
+        setError(firstError);
+      }
+      clipCancellingRef.current = false;
       setIsExtracting(false);
     }
   }
@@ -845,21 +1065,21 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
         <small>MP4 · MKV · MOV · WEBM · AVI : multiple files accepted</small>
       </div>
       <div className="clip-extractor-rail">
-        <button type="button" className="clip-import-button" onClick={pickVideo}>
+        <button type="button" className="clip-import-button glass spring-motion" onClick={pickVideo}>
           <span className="clip-import-mark">
             <Scissors size={32} strokeWidth={1.9} />
           </span>
           <span>{selectedVideos.length > 0 ? "Change episodes" : "Select episodes"}</span>
         </button>
 
-        <div className="clip-source-card">
+        <div className="clip-source-card glass">
           <div className="clip-source-header">
             <div className="clip-source-info">
               <small>Source</small>
               <strong>{displayName}</strong>
             </div>
           <div
-            className={`clip-server-badge ${serverStatus === "ready" ? "is-ready" : serverStatus === "warming" ? "is-warming" : ""}`}
+            className={`clip-server-badge spring-motion ${serverStatus === "ready" ? "is-ready" : serverStatus === "warming" ? "is-warming" : ""}`}
             title={serverStatus === "ready" ? "Clip Server is warm and ready" : serverStatus === "warming" ? "Clip Server is warming up..." : "Clip Server is cold"}
           >
             {serverStatus === "ready" ? "Ready" : serverStatus === "warming" ? "Warming" : "Cold"}
@@ -881,11 +1101,30 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
         <div className="clip-tool-stack" aria-label="Clip extractor actions">
           <button
             type="button"
-            className={`clip-tool-button ${gridPreview ? "is-active" : ""}`}
+            className={`clip-tool-button spring-motion ${gridPreview ? "is-active" : ""}`}
             onClick={() => setGridPreview((value) => !value)}
           >
             <Film size={18} strokeWidth={2} />
             <span>Grid preview</span>
+          </button>
+
+          <button
+            type="button"
+            className={`clip-tool-button spring-motion ${hoverPlayOnly ? "is-active" : ""}`}
+            onClick={() => {
+              const next = !hoverPlayOnly;
+              setHoverPlayOnly(next);
+              try {
+                localStorage.setItem(CLIP_HOVER_PREVIEW_KEY, next ? "true" : "false");
+                window.dispatchEvent(new CustomEvent("clip-hover-preview-changed"));
+              } catch {
+                // Safe fallback
+              }
+            }}
+            title={hoverPlayOnly ? "Only plays previews on hover (Lighter on system)" : "Plays all visible previews simultaneously"}
+          >
+            <Zap size={18} strokeWidth={2} />
+            <span>Hover preview only</span>
           </button>
 
           <div className="clip-cols-control">
@@ -939,7 +1178,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
             <>
               <button
                 type="button"
-                className={`clip-tool-button ${selectedCount > 0 ? 'is-active-primary' : ''}`}
+                className={`clip-tool-button spring-motion ${selectedCount > 0 ? 'is-active-primary' : ''}`}
                 disabled={selectedCount === 0 || isExtracting}
                 onClick={startExport}
               >
@@ -949,7 +1188,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
 
               <button
                 type="button"
-                className={`clip-tool-button ${hasClips && selectedCount === clips.length ? "is-active" : ""}`}
+                className={`clip-tool-button spring-motion ${hasClips && selectedCount === clips.length ? "is-active" : ""}`}
                 disabled={!hasClips || isExtracting}
                 onClick={toggleAllClipSelection}
               >
@@ -961,7 +1200,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
 
           <button
             type="button"
-            className={`clip-tool-button ${mergeMode ? "is-active" : ""}`}
+            className={`clip-tool-button spring-motion ${mergeMode ? "is-active" : ""}`}
             disabled={!hasClips}
             onClick={toggleMergeMode}
           >
@@ -972,7 +1211,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
           {mergeMode && (
             <button
               type="button"
-              className="clip-confirm-button"
+              className="clip-confirm-button spring-motion accent-glow"
               disabled={mergeOrder.length < 2 || isExtracting}
               onClick={startMergeExport}
               title={mergeOrder.length < 2 ? "Select at least 2 clips to merge" : `Merge into ${mergeFilenameStem}.mov`}
@@ -987,15 +1226,15 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
           )}
         </div>
 
-        {(progress || error || result) && (
-          <div className={`clip-run-card ${error ? "is-error" : ""}`}>
+        {!exportSession && (progress || error || result) && (
+          <div className={`clip-run-card glass ${error ? "is-error" : ""}`}>
             <div className="clip-run-line">
               <strong>{error ? "Extraction failed" : formatClipProgressStage(progress?.stage)}</strong>
               {progress && <span>{Math.round(progress.percent)}%</span>}
             </div>
             {progress && (
               <div className={`clip-progress-track ${isExtracting && progress.percent <= 0 ? "is-indeterminate" : ""}`}>
-                <span style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }} />
+                <span className="spring-motion" style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }} />
               </div>
             )}
             <p>{runMessage}</p>
@@ -1007,10 +1246,10 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
           <span>ProRes and Intra frame formats are best for After Effects responsiveness.</span>
         </div>
 
-        <button type="button" className="clip-primary-action" disabled={!canExtract} onClick={() => void startExtraction()}>
+        <button type="button" className="clip-primary-action spring-motion accent-glow" disabled={!canExtract} onClick={() => void startExtraction()}>
           {isExtracting ? "Extracting..." : hasClips ? "Extract again" : "Extract clips"}
         </button>
-        {isExtracting && (
+        {isExtracting && !exportSession && (
           <button
             type="button"
             className="clip-cancel-action"
@@ -1025,7 +1264,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
             Cancel
           </button>
         )}
-        {isExtracting && !isConverting && (
+        {isExtracting && !exportSession && !isConverting && (
           <button
             type="button"
             className="clip-convert-suggest"
@@ -1095,7 +1334,9 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
 
         {!hasClips && gridPreview && (
           <div className="clip-empty-state">
-            {isExtracting ? <Loader2 className="is-spinning" size={36} strokeWidth={1.8} /> : <Clapperboard size={36} strokeWidth={1.7} />}
+            <div className="surface-mark accent-glow" style={{ marginBottom: '20px' }}>
+              {isExtracting ? <Loader2 className="is-spinning" size={36} strokeWidth={1.8} /> : <Clapperboard size={36} strokeWidth={1.7} />}
+            </div>
             <h2>{isExtracting ? "Extracting clips" : "Clip extractor"}</h2>
             <p>{progress?.message ?? error ?? (selectedVideos.length > 0 ? "Ready for RTX TransNetV2." : "No clips yet.")}</p>
           </div>
@@ -1112,6 +1353,15 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
         />
 
         <SceneViewerModal clip={viewerClip} onClose={closeViewer} />
+
+        <ClipExportProgressModal
+          session={exportSession}
+          onCancel={() => {
+            clipCancellingRef.current = true;
+            void invoke("cancel_clip");
+          }}
+          onClose={() => setExportSession(null)}
+        />
 
         {mergeMode && (
           <div className={`merge-strip ${mergeOrderedClips.length > 0 ? "is-active" : "is-empty"}`} aria-live="polite">

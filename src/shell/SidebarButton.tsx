@@ -16,7 +16,7 @@ export function SidebarButton({
   return (
     <button
       type="button"
-      className={`nav-button ${active ? "is-active" : ""}`}
+      className={`nav-button spring-motion ${active ? "is-active" : ""}`}
       aria-label={item.label}
       title={expanded ? undefined : item.label}
       onClick={onClick}

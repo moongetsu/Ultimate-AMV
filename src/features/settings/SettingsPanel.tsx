@@ -10,6 +10,7 @@ import { parseBridgePayload, readBridgeError } from "../../utils/bridge";
 import type { AppConfig } from "../../types/app";
 import type { AudioSetupProgress, AudioStatus } from "../../types/audio";
 import { UpdateCard } from "./UpdateCard";
+import { CLIP_HOVER_PREVIEW_KEY } from "../../lib/constants";
 
 function formatSetupLogLine(progress: AudioSetupProgress): string {
   const parts = [];
@@ -40,6 +41,27 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
   const [cacheNotice, setCacheNotice] = React.useState<string | null>(null);
   const [cacheError, setCacheError] = React.useState<string | null>(null);
   const [discordEnabled, setDiscordEnabledLocal] = React.useState(isDiscordEnabled);
+  const [hoverPreviewEnabled, setHoverPreviewEnabled] = React.useState<boolean>(() => {
+    try {
+      return localStorage.getItem(CLIP_HOVER_PREVIEW_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  React.useEffect(() => {
+    const handlePrefChanged = () => {
+      try {
+        setHoverPreviewEnabled(localStorage.getItem(CLIP_HOVER_PREVIEW_KEY) === "true");
+      } catch {
+        // Safe fallback
+      }
+    };
+    window.addEventListener("clip-hover-preview-changed", handlePrefChanged);
+    return () => {
+      window.removeEventListener("clip-hover-preview-changed", handlePrefChanged);
+    };
+  }, []);
 
   function toggleDiscordPresence() {
     const next = !discordEnabled;
@@ -190,12 +212,11 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
       </div>
 
       <div className="settings-groups">
-
         <UpdateCard />
 
-        <div className="settings-group">
+        <div className="settings-group glass">
           <div className="settings-group-header">AI Hardware Engine</div>
-          <div className="settings-engine-warning">
+          <div className="settings-engine-warning accent-glow">
             <AlertTriangle size={15} />
             <span>
               This engine is shared between <strong>Vocal Extraction</strong> and <strong>Clip Extraction</strong>.
@@ -246,14 +267,14 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
 
           <div className="deps-switch-actions">
             {gpuSetupBlocked && (
-              <div className="settings-gpu-warning">
+              <div className="settings-gpu-warning glass">
                 <AlertTriangle size={15} />
                 <span>Compatible GPU not found. GPU Vocal Extraction needs an NVIDIA CUDA GPU.</span>
               </div>
             )}
             <button
               type="button"
-              className={`install-btn ${currentMode === "gpu" ? "is-primary" : "is-secondary"}`}
+              className={`install-btn spring-motion ${currentMode === "gpu" ? "is-primary accent-glow" : "is-secondary"}`}
               onClick={() => switchMode("gpu")}
               disabled={settingsChecking || gpuAllSet || setupRunning !== null || gpuSetupBlocked}
               title={
@@ -270,7 +291,7 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
 
             <button
               type="button"
-              className={`install-btn ${currentMode === "cpu" ? "is-primary" : "is-secondary"}`}
+              className={`install-btn spring-motion ${currentMode === "cpu" ? "is-primary accent-glow" : "is-secondary"}`}
               onClick={() => switchMode("cpu")}
               disabled={settingsChecking || cpuAllSet || setupRunning !== null}
               title={settingsChecking ? "Checking current setup..." : cpuAllSet ? "CPU mode is ready" : "Switch to CPU mode"}
@@ -309,7 +330,7 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
           )}
         </div>
 
-        <div className="settings-group">
+        <div className="settings-group glass">
           <div className="settings-group-header">Clip Extraction</div>
 
           <div className="setting-row">
@@ -328,9 +349,46 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
             </div>
           </div>
 
+          <div className="setting-row">
+            <div className="setting-info">
+              <span className="setting-label">Hover-to-Play Previews</span>
+              <span className="setting-desc">
+                Only play animated clip loops when hovering over a tile. Dramatically reduces CPU and GPU usage on larger grids.
+              </span>
+            </div>
+            <div className="settings-toggle-wrap">
+              <span className={`settings-toggle-label ${hoverPreviewEnabled ? "is-on" : "is-off"}`}>
+                {hoverPreviewEnabled ? "Enabled" : "Disabled"}
+              </span>
+              <button
+                type="button"
+                className="settings-toggle-switch spring-motion"
+                role="switch"
+                aria-checked={hoverPreviewEnabled}
+                aria-label="Hover-to-Play Previews"
+                data-on={hoverPreviewEnabled ? "true" : "false"}
+                onClick={() => {
+                  const next = !hoverPreviewEnabled;
+                  setHoverPreviewEnabled(next);
+                  try {
+                    localStorage.setItem(CLIP_HOVER_PREVIEW_KEY, next ? "true" : "false");
+                    window.dispatchEvent(new CustomEvent("clip-hover-preview-changed"));
+                  } catch {
+                    // Safe fallback
+                  }
+                }}
+              >
+                <span className="settings-toggle-track" aria-hidden="true">
+                  <span className="settings-toggle-track-on">ON</span>
+                  <span className="settings-toggle-track-off">OFF</span>
+                  <span className="settings-toggle-knob" />
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="settings-group">
+        <div className="settings-group glass">
           <div className="settings-group-header">Vocal Extraction</div>
           <div className="setting-row">
             <div className="setting-info">
@@ -353,7 +411,7 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
           </div>
         </div>
 
-        <div className="settings-group">
+        <div className="settings-group glass">
           <div className="settings-group-header">Downloads</div>
           <div className="setting-row">
             <div className="setting-info" style={{ flex: 1, minWidth: 0 }}>
@@ -374,7 +432,7 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
             />
             <button
               type="button"
-              className="settings-path-browse-btn"
+              className="settings-path-browse-btn spring-motion"
               onClick={async () => {
                 const { open: openDialog } = await import("@tauri-apps/plugin-dialog");
                 const selected = await openDialog({ directory: true, multiple: false });
@@ -389,7 +447,7 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
           </div>
         </div>
 
-        <div className="settings-group">
+        <div className="settings-group glass">
           <div className="settings-group-header">Appearance</div>
           <div className="setting-row theme-setting-row">
             <div className="setting-info">
@@ -446,7 +504,7 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
             </div>
             <button
               type="button"
-              className="settings-action-pill"
+              className="settings-action-pill spring-motion"
               onClick={() => window.dispatchEvent(new CustomEvent("bg-customize-open"))}
               title={backendConfig?.background_image ? "Open the background customizer" : "Choose a background image"}
             >
@@ -468,7 +526,7 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
           </div>
         </div>
 
-        <div className="settings-group">
+        <div className="settings-group glass">
           <div className="settings-group-header">Discord Rich Presence</div>
           <div className="setting-row">
             <div className="setting-info">
@@ -486,7 +544,7 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
               </span>
               <button
                 type="button"
-                className="settings-toggle-switch"
+                className="settings-toggle-switch spring-motion"
                 role="switch"
                 aria-checked={discordEnabled}
                 aria-label="Show activity on Discord"
@@ -504,7 +562,7 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
           </div>
         </div>
 
-        <div className="settings-group">
+        <div className="settings-group glass">
           <div className="settings-group-header">Storage</div>
           <div className="setting-row">
             <div className="setting-info">
@@ -515,7 +573,7 @@ export function SettingsPanel({ themeColors }: SettingsPanelProps) {
             </div>
             <button
               type="button"
-              className="settings-action-pill is-danger"
+              className="settings-action-pill is-danger spring-motion"
               onClick={() => void clearCache()}
               disabled={clearingCache}
               title="Delete cached clip preview files"

@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Loader2, Wand2, X } from "lucide-react";
 import { fileName } from "../../lib/paths";
 
@@ -38,7 +39,7 @@ export function ClipCompatConvertModal({
 
   const displayName = failedPath ? fileName(failedPath) : "This episode";
 
-  return (
+  return createPortal(
     <div className="episode-label-backdrop" role="dialog" aria-label="Unsupported format">
       <div className="episode-label-modal">
         <div className="episode-label-header">
@@ -110,6 +111,7 @@ export function ClipCompatConvertModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

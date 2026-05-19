@@ -275,7 +275,7 @@ export function AudioExtractionPanel() {
         <span>Drop audio or video to extract vocals</span>
         <small>WAV · MP3 · FLAC · M4A · MP4 · MKV · MOV · WEBM · AVI</small>
       </div>
-      <div className={`audio-status-line ${status ? "" : "is-pending"}`} aria-hidden={status ? undefined : true}>
+      <div className={`audio-status-line glass spring-motion ${status ? "" : "is-pending"}`} aria-hidden={status ? undefined : true}>
         {status && (
           <>
             <span>

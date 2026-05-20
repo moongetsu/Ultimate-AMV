@@ -265,7 +265,7 @@ describe('ClipPreviewTile — selection and mergeMode rendering', () => {
     const mainBtn = wrapper.querySelector('button.clip-preview-tile') as HTMLElement
     await userEvent.click(mainBtn)
     expect(onClick).toHaveBeenCalledTimes(1)
-    expect(onClick).toHaveBeenCalledWith({ ctrl: false, shift: false, doubleClick: false })
+    expect(onClick).toHaveBeenCalledWith({ ctrl: false, shift: false })
   })
 
   it('calls onClick with ctrl modifier when Ctrl+click on tile', async () => {
@@ -275,19 +275,7 @@ describe('ClipPreviewTile — selection and mergeMode rendering', () => {
     const wrapper = document.querySelector('.clip-preview-tile-wrapper')!
     const mainBtn = wrapper.querySelector('button.clip-preview-tile') as HTMLElement
     fireEvent.click(mainBtn, { ctrlKey: true })
-    expect(onClick).toHaveBeenCalledWith({ ctrl: true, shift: false, doubleClick: false })
-  })
-
-  it('calls onClick with doubleClick on double click', async () => {
-    const onClick = vi.fn()
-    const clip = makeClip()
-    render(<ClipPreviewTile {...defaultProps} clip={clip} onClick={onClick} />)
-    const wrapper = document.querySelector('.clip-preview-tile-wrapper')!
-    const mainBtn = wrapper.querySelector('button.clip-preview-tile') as HTMLElement
-    // Simulate double click by clicking twice quickly
-    await userEvent.dblClick(mainBtn)
-    // The double click detection fires on the second click
-    expect(onClick).toHaveBeenCalledWith(expect.objectContaining({ doubleClick: true }))
+    expect(onClick).toHaveBeenCalledWith({ ctrl: true, shift: false })
   })
 })
 

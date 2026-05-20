@@ -95,12 +95,10 @@ export function ClipPreviewTile({
   playable: boolean;
   activationEpoch: number;
   clipHoverPreview: boolean;
-  onClick: (modifiers: { ctrl: boolean; shift: boolean; doubleClick: boolean }) => void;
+  onClick: (modifiers: { ctrl: boolean; shift: boolean }) => void;
   onToggleSelect: () => void;
 }) {
   const [isHovered, setIsHovered] = React.useState(false);
-  const clickCountRef = React.useRef(0);
-  const clickTimerRef = React.useRef<number | null>(null);
 
   const previewRange = previewClipPlaybackRange(clip);
   const isPlayActive = !clipHoverPreview || isHovered;
@@ -112,17 +110,26 @@ export function ClipPreviewTile({
     : 0;
   const [isReady, setIsReady] = React.useState(false);
 
-  React.useEffect(() => {
-    setIsReady(false);
-  }, [previewRange?.src, activationEpoch]);
+  // Bumps on every shouldPlay false→true transition inside this mounted
+  // tile (hover replay, playable cap flips). Combined with activationEpoch
+  // it forces Chromium to re-decode from frame 0 so the animated image
+  // and the CSS progress bar restart in lockstep. Init is 0 (NOT
+  // Date.now()) so Virtuoso scroll-recycle remounts reuse the browser's
+  // disk-decoded WebP cache instead of re-fetching every time a tile
+  // re-enters the overscan window — a per-mount-unique URL would
+  // re-decode the entire visible grid on every long scroll.
+  const [playToken, setPlayToken] = React.useState(0);
+  const wasPlayingRef = React.useRef(shouldPlay);
+  React.useLayoutEffect(() => {
+    if (shouldPlay && !wasPlayingRef.current) {
+      setPlayToken((value) => value + 1);
+    }
+    wasPlayingRef.current = shouldPlay;
+  }, [shouldPlay]);
 
   React.useEffect(() => {
-    return () => {
-      if (clickTimerRef.current) {
-        window.clearTimeout(clickTimerRef.current);
-      }
-    };
-  }, []);
+    setIsReady(false);
+  }, [previewRange?.src, activationEpoch, playToken]);
 
   return (
     <div
@@ -133,29 +140,7 @@ export function ClipPreviewTile({
       <button
         type="button"
         className={`clip-preview-tile spring-motion ${selected ? "is-selected" : ""} ${mergeMode ? "is-selectable" : ""}`}
-        onClick={(e) => {
-          const isCtrl = e.ctrlKey || e.metaKey;
-          const isShift = e.shiftKey;
-
-          clickCountRef.current += 1;
-
-          if (clickCountRef.current === 2) {
-            // Double click detected
-            if (clickTimerRef.current) {
-              window.clearTimeout(clickTimerRef.current);
-              clickTimerRef.current = null;
-            }
-            clickCountRef.current = 0;
-            onClick({ ctrl: isCtrl, shift: isShift, doubleClick: true });
-            return;
-          }
-
-          // Set timer for single click
-          clickTimerRef.current = window.setTimeout(() => {
-            clickCountRef.current = 0;
-            onClick({ ctrl: isCtrl, shift: isShift, doubleClick: false });
-          }, 250);
-        }}
+        onClick={(e) => onClick({ ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey })}
       >
         {/* Base layer: the static thumbnail when we have one, placeholder otherwise. */}
         {/* Stays mounted while shouldPlay flips so the animated WebP fades in over */}
@@ -169,9 +154,8 @@ export function ClipPreviewTile({
         )}
         {shouldPlay && previewRange && (
           <img
-            key={`${previewRange.id}-${activationEpoch}`}
-            // Cache-bust on activation: Chromium otherwise serves the WebP from its decoded image cache and the animation stays mid-cycle, desynced from the bar.
-            src={`${previewRange.src}?v=${activationEpoch}`}
+            key={`${previewRange.id}-${activationEpoch}-${playToken}`}
+            src={`${previewRange.src}?v=${activationEpoch}-${playToken}`}
             alt=""
             className={`clip-animated-overlay ${isReady ? "is-ready" : "is-loading"}`}
             onLoad={() => setIsReady(true)}
@@ -184,7 +168,7 @@ export function ClipPreviewTile({
             style={{ "--clip-loop-duration": `${loopDuration}s` } as React.CSSProperties}
             aria-hidden="true"
           >
-            <span key={`${previewRange.id}-${activationEpoch}`} />
+            <span key={`${previewRange.id}-${activationEpoch}-${playToken}`} />
           </span>
         )}
         <span className="clip-tile-scrim" />

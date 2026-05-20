@@ -2,9 +2,9 @@ import React from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowRight, CheckCircle2, Clapperboard, Film, Info, Loader2, Scissors, Upload, X, Zap } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Clapperboard, Film, Info, Loader2, Scissors, Upload, X, Zap } from "lucide-react";
 import { Dropdown } from "../../components/Dropdown";
-import { Virtuoso } from "react-virtuoso";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import {
   CLIP_AUDIO_SETTINGS_KEY,
   CLIP_COLUMN_OPTIONS,
@@ -108,6 +108,8 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   const [exportMinimized, setExportMinimized] = React.useState(false);
   const exportSessionRef = React.useRef<ClipExportSession | null>(null);
   const lastSelectedIdRef = React.useRef<string | null>(null);
+  const virtuosoRef = React.useRef<VirtuosoHandle | null>(null);
+  const selectionCursorIdRef = React.useRef<string | null>(null);
   React.useEffect(() => {
     exportSessionRef.current = exportSession;
     if (!exportSession) setExportMinimized(false);
@@ -297,6 +299,10 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     previewInFlightRef.current.clear();
     previewBatchInFlightRef.current = 0;
     setPreviewStates({});
+    // Stale anchor would otherwise point into the previous extraction's
+    // clip ids, making the first jump-to-selection click after a new
+    // extraction land on the wrong end of the list.
+    selectionCursorIdRef.current = null;
   }, [result?.input]);
 
   function acceptVideos(paths: string[]) {
@@ -431,20 +437,28 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     if (!gridPreview) return active;
     if (clipRows.length <= 0) return active;
 
-    const autoplayLimit = MAX_GRID_AUTOPLAYERS;
-    const startRow = Math.max(0, Math.min(visibleRowRange?.startIndex ?? 0, clipRows.length - 1));
-    const minimumEndRow = startRow + Math.ceil(autoplayLimit / gridCols) - 1;
-    const endRow = Math.min(
-      clipRows.length - 1,
-      Math.max(visibleRowRange?.endIndex ?? minimumEndRow, minimumEndRow),
-    );
+    // Play exactly the rows the user can see, plus one row above and one
+    // below as a scroll buffer so the next row is already animating when
+    // it enters view (avoids the warm-up flash). Scales naturally with
+    // gridCols because Virtuoso reports visible *rows* and the count of
+    // active clips becomes rows × cols. Old logic walked downward until
+    // it hit MAX_GRID_AUTOPLAYERS=100, which meant ~33 rows of animated
+    // WebPs were compositing on every frame at 3 columns — visible cause
+    // of the grid lag at large clip counts. MAX_GRID_AUTOPLAYERS stays
+    // as a hard ceiling for unusually tall viewports but rarely fires.
+    const OVERSCAN_ROWS = 1;
+    const lastRow = clipRows.length - 1;
+    const baseStart = visibleRowRange?.startIndex ?? 0;
+    const baseEnd = visibleRowRange?.endIndex ?? baseStart;
+    const startRow = Math.max(0, baseStart - OVERSCAN_ROWS);
+    const endRow = Math.min(lastRow, baseEnd + OVERSCAN_ROWS);
 
     for (let rowIndex = startRow; rowIndex <= endRow; rowIndex += 1) {
       for (const clip of clipRows[rowIndex] ?? []) {
         active.add(clip.id);
-        if (active.size >= autoplayLimit) break;
+        if (active.size >= MAX_GRID_AUTOPLAYERS) break;
       }
-      if (active.size >= autoplayLimit) break;
+      if (active.size >= MAX_GRID_AUTOPLAYERS) break;
     }
     return active;
   }, [clipRows, gridCols, gridPreview, visibleRowRange]);
@@ -569,9 +583,10 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     }
   }, [activeGridClipIds, clipMode, clips, gridPreview, hasClips, previewStates]);
 
-  async function startExtraction(overrideVideos?: string[]) {
+  async function startExtraction(overrideVideos?: string[], options?: { force?: boolean }) {
     const videos = overrideVideos ?? selectedVideos;
     if (videos.length === 0 || isExtracting) return;
+    const force = options?.force ?? false;
 
     // Preflight codec check : only the GPU path is codec-fragile. nelux+NVDEC
     // can hang in native code on anything outside the supported set; CPU mode
@@ -642,8 +657,20 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
           percent: Math.round((index / videos.length) * 100),
           message: `Episode ${index + 1}/${videos.length}: ${fileName(inputPath)}`,
         });
-        const raw = await invoke<string>("clip_extract", { inputPath, mode: clipMode });
-        const payload = raw.includes("server_task_started")
+        const raw = await invoke<string>("clip_extract", { inputPath, mode: clipMode, force });
+        // Strict type check rather than substring — the cached "done" payload
+        // returned for a cache hit is the same shape as a real done event and
+        // could theoretically contain the literal string in a path, scene
+        // label, or error field. Substring matching would route those to the
+        // server-wait branch and the frontend would hang forever.
+        let isServerTask = false;
+        try {
+          const peek = JSON.parse(raw) as { type?: string } | null;
+          isServerTask = peek?.type === "server_task_started";
+        } catch {
+          isServerTask = false;
+        }
+        const payload = isServerTask
           ? await waitForClipServerResult(clipAbortRef)
           : parseBridgePayload<ClipExtractionResult>(raw);
         results.push(payload);
@@ -761,19 +788,12 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
 
   function selectClip(clipId: string) {
     setSelectedClipIds((current) => {
+      if (current.has(clipId)) return current;
       const next = new Set(current);
       next.add(clipId);
       return next;
     });
     lastSelectedIdRef.current = clipId;
-  }
-
-  function deselectClip(clipId: string) {
-    setSelectedClipIds((current) => {
-      const next = new Set(current);
-      next.delete(clipId);
-      return next;
-    });
   }
 
   function toggleClipSelection(clipId: string) {
@@ -807,6 +827,29 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     lastSelectedIdRef.current = toId;
   }
 
+  function jumpToSelection(direction: "next" | "prev") {
+    if (selectedClipIds.size === 0) return;
+    const ordered: { id: string; index: number }[] = [];
+    for (let i = 0; i < clips.length; i++) {
+      if (selectedClipIds.has(clips[i].id)) ordered.push({ id: clips[i].id, index: i });
+    }
+    if (ordered.length === 0) return;
+    const cursorId = selectionCursorIdRef.current;
+    const cursorPos = cursorId ? ordered.findIndex((e) => e.id === cursorId) : -1;
+    let targetPos: number;
+    if (cursorPos === -1) {
+      targetPos = direction === "next" ? 0 : ordered.length - 1;
+    } else if (direction === "next") {
+      targetPos = (cursorPos + 1) % ordered.length;
+    } else {
+      targetPos = (cursorPos - 1 + ordered.length) % ordered.length;
+    }
+    const target = ordered[targetPos];
+    selectionCursorIdRef.current = target.id;
+    const rowIndex = Math.floor(target.index / gridCols);
+    virtuosoRef.current?.scrollToIndex({ index: rowIndex, align: "center", behavior: "smooth" });
+  }
+
   function toggleAllClipSelection() {
     if (!hasClips) return;
     setSelectedClipIds((current) => {
@@ -819,22 +862,17 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
 
   function handleClipClick(
     clip: ClipPreviewItem,
-    modifiers: { ctrl: boolean; shift: boolean; doubleClick: boolean },
+    modifiers: { ctrl: boolean; shift: boolean },
   ) {
     if (mergeMode) {
       toggleMergeOrder(clip.id);
       return;
     }
 
-    // Double click: select only (no preview)
-    if (modifiers.doubleClick) {
-      selectClip(clip.id);
-      return;
-    }
-
-    // Ctrl+Shift+click: add range to existing selection
-    if (modifiers.ctrl && modifiers.shift && lastSelectedIdRef.current) {
-      selectRange(lastSelectedIdRef.current, clip.id, true);
+    // Ctrl+Shift+click: add range to existing selection (falls back to plain select if no anchor)
+    if (modifiers.ctrl && modifiers.shift) {
+      if (lastSelectedIdRef.current) selectRange(lastSelectedIdRef.current, clip.id, true);
+      else selectClip(clip.id);
       return;
     }
 
@@ -844,13 +882,15 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
       return;
     }
 
-    // Shift+click: range selection (replaces current selection)
-    if (modifiers.shift && lastSelectedIdRef.current) {
-      selectRange(lastSelectedIdRef.current, clip.id, false);
+    // Shift+click: range selection (replaces). Anchor missing -> seed it with this tile.
+    if (modifiers.shift) {
+      if (lastSelectedIdRef.current) selectRange(lastSelectedIdRef.current, clip.id, false);
+      else selectClip(clip.id);
       return;
     }
 
-    // Single click without modifiers: just preview
+    // Plain click: open scene viewer with audio. Selection lives on the corner
+    // button (clip-corner-select) and the modifier paths above.
     setViewerClipId(clip.id);
   }
 
@@ -1352,7 +1392,12 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
           <span>ProRes and Intra frame formats are best for After Effects responsiveness.</span>
         </div>
 
-        <button type="button" className="clip-primary-action spring-motion accent-glow" disabled={!canExtract} onClick={() => void startExtraction()}>
+        <button
+          type="button"
+          className="clip-primary-action spring-motion accent-glow"
+          disabled={!canExtract}
+          onClick={() => void startExtraction(undefined, { force: hasClips })}
+        >
           {isExtracting ? "Extracting..." : hasClips ? "Extract again" : "Extract clips"}
         </button>
         {isExtracting && !exportSession && (
@@ -1385,6 +1430,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
       <div className="clip-extractor-stage">
         {hasClips ? (
           <Virtuoso
+            ref={virtuosoRef}
             data={clipRows}
             overscan={1000}
             increaseViewportBy={1000}
@@ -1429,6 +1475,30 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
             }
           >
             {Array.from({ length: 12 }, (_, index) => <div key={index} className="clip-preview-skeleton" />)}
+          </div>
+        )}
+
+        {hasClips && selectedClipIds.size > 0 && !mergeMode && (
+          <div className="clip-jump-pill" role="group" aria-label="Jump through selected clips">
+            <button
+              type="button"
+              className="clip-jump-pill-btn spring-motion"
+              onClick={() => jumpToSelection("prev")}
+              title="Jump to previous selected clip"
+              aria-label="Jump to previous selected clip"
+            >
+              <ChevronUp size={16} strokeWidth={2.4} />
+            </button>
+            <span className="clip-jump-pill-count" aria-hidden="true">{selectedClipIds.size}</span>
+            <button
+              type="button"
+              className="clip-jump-pill-btn spring-motion"
+              onClick={() => jumpToSelection("next")}
+              title="Jump to next selected clip"
+              aria-label="Jump to next selected clip"
+            >
+              <ChevronDown size={16} strokeWidth={2.4} />
+            </button>
           </div>
         )}
 

@@ -1,72 +1,9 @@
 import React from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { AlertTriangle, Copy, ScrollText, Trash2, Search, Filter, Download, AlertCircle, Info, AlertOctagon, X, RotateCcw, ChevronDown, Check } from "lucide-react";
+import { AlertTriangle, Copy, ScrollText, Trash2, Search, Filter, Download, Info, AlertOctagon, X, RotateCcw } from "lucide-react";
 import { logFrontend, safeLogValue } from "../../lib/log";
 import { parseBridgePayload, readBridgeError } from "../../utils/bridge";
-
-// Custom Dropdown Component
-interface DropdownOption {
-  value: string;
-  label: string;
-}
-
-function CustomDropdown({ 
-  value, 
-  options, 
-  onChange, 
-  placeholder = "Select..." 
-}: { 
-  value: string; 
-  options: DropdownOption[]; 
-  onChange: (value: string) => void;
-  placeholder?: string;
-}) {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const dropdownRef = React.useRef<HTMLDivElement>(null);
-  
-  const selectedLabel = options.find(opt => opt.value === value)?.label || placeholder;
-  
-  React.useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-  
-  return (
-    <div className="custom-dropdown" ref={dropdownRef}>
-      <button 
-        type="button" 
-        className="custom-dropdown-trigger"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <span>{selectedLabel}</span>
-        <ChevronDown size={14} className={`custom-dropdown-chevron ${isOpen ? "is-open" : ""}`} />
-      </button>
-      {isOpen && (
-        <div className="custom-dropdown-menu">
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`custom-dropdown-item ${value === option.value ? "is-selected" : ""}`}
-              onClick={() => {
-                onChange(option.value);
-                setIsOpen(false);
-              }}
-            >
-              {value === option.value && <Check size={12} />}
-              <span>{option.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+import { Dropdown } from "../../components/Dropdown";
 
 type LogLevel = "all" | "info" | "warn" | "error";
 
@@ -420,7 +357,7 @@ export function LogsPanel() {
         <div className="logs-filters">
           <div className="logs-filter-group">
             <label>Category:</label>
-            <CustomDropdown
+            <Dropdown<string>
               value={selectedCategory}
               onChange={setSelectedCategory}
               placeholder="All categories"

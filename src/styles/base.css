@@ -214,6 +214,23 @@ button {
 :root.has-app-bg .clip-extractor-rail {
   background: rgba(13, 16, 22, 0.65);
 }
+/* Downloader: the workspace itself stays transparent (browser tiles are
+   the feature), but the top mode-switcher (Anime Download / YouTube
+   Download tabs) and the right-side queue panel need a near-opaque
+   scrim PLUS a brighter dividing border so they read as distinct UI
+   blocks even when the wallpaper underneath is mostly dark (the 0.65
+   tone used elsewhere blends into a dark wallpaper and looks like
+   nothing was applied). */
+:root.has-app-bg .focus-panel .mode-switcher,
+:root.has-app-bg .download-queue-panel {
+  background: rgba(13, 16, 22, 0.92);
+}
+:root.has-app-bg .focus-panel .mode-switcher {
+  border-bottom: 2px solid rgba(255, 255, 255, 0.22);
+}
+:root.has-app-bg .download-queue-panel {
+  border-left: 2px solid rgba(255, 255, 255, 0.22);
+}
 :root.has-app-bg .youtube-downloader {
   background:
     linear-gradient(135deg, rgb(var(--theme-accent-rgb) / 0.08), transparent 38%);

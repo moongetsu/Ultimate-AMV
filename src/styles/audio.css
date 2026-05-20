@@ -805,9 +805,8 @@
 
 .conversion-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 380px);
-  align-items: end;
-  gap: 28px;
+  grid-template-columns: 1fr;
+  gap: 18px;
   padding-bottom: 22px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
@@ -1059,8 +1058,9 @@
 }
 
 .run-card {
+  align-self: start;
   border-left: 1px solid rgba(255, 255, 255, 0.07);
-  padding-left: 40px;
+  padding: 0 0 28px 24px;
 }
 
 .conversion-icon {
@@ -1125,23 +1125,30 @@
   opacity: 0.45;
 }
 
-.conversion-run-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
-  align-items: start;
+.conversion-run-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
 }
 
-.conversion-run-head strong {
+.source-card-action {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.source-card-action strong {
   font-size: 19px;
 }
 
 .conversion-run-btn {
-  min-width: 112px;
-  padding: 0 16px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 14px;
   border: none;
   color: #04131a;
   background: var(--accent-gradient);
+  font-size: 12.5px;
   font-weight: 860;
 }
 

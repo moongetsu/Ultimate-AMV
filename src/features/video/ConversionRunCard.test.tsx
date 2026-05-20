@@ -15,28 +15,9 @@ vi.mock('../audio/BatchStatusList', () => ({
 }))
 
 describe('ConversionRunCard', () => {
-  it('renders title and subtitle', () => {
-    render(
-      <ConversionRunCard
-        title="ProRes 422 LT"
-        subtitle="10-bit 4:2:2 ProRes LT MOV"
-        canRun={false}
-        running={false}
-        progress={null}
-        result={null}
-        error={null}
-        onRun={vi.fn()}
-      />,
-    )
-    expect(screen.getByText('ProRes 422 LT')).toBeInTheDocument()
-    expect(screen.getByText('10-bit 4:2:2 ProRes LT MOV')).toBeInTheDocument()
-  })
-
   it('renders Start button when not running', () => {
     render(
       <ConversionRunCard
-        title="ProRes LT"
-        subtitle=""
         canRun={true}
         running={false}
         progress={null}
@@ -51,8 +32,6 @@ describe('ConversionRunCard', () => {
   it('Start button is disabled when canRun is false', () => {
     render(
       <ConversionRunCard
-        title="ProRes LT"
-        subtitle=""
         canRun={false}
         running={false}
         progress={null}
@@ -69,8 +48,6 @@ describe('ConversionRunCard', () => {
     const onRun = vi.fn()
     render(
       <ConversionRunCard
-        title="ProRes LT"
-        subtitle=""
         canRun={true}
         running={false}
         progress={null}
@@ -86,8 +63,6 @@ describe('ConversionRunCard', () => {
   it('renders Cancel button when running and onCancel provided', () => {
     render(
       <ConversionRunCard
-        title="ProRes LT"
-        subtitle=""
         canRun={false}
         running={true}
         progress={null}
@@ -105,8 +80,6 @@ describe('ConversionRunCard', () => {
     const onCancel = vi.fn()
     render(
       <ConversionRunCard
-        title="ProRes LT"
-        subtitle=""
         canRun={false}
         running={true}
         progress={null}
@@ -123,8 +96,6 @@ describe('ConversionRunCard', () => {
   it('renders progress message', () => {
     render(
       <ConversionRunCard
-        title="ProRes LT"
-        subtitle=""
         canRun={false}
         running={true}
         progress={{ stage: 'encoding', percent: 45, message: 'Encoding frame 450/1000' }}
@@ -139,8 +110,6 @@ describe('ConversionRunCard', () => {
   it('renders progress bar with correct width', () => {
     const { container } = render(
       <ConversionRunCard
-        title="ProRes LT"
-        subtitle=""
         canRun={false}
         running={true}
         progress={{ stage: 'encoding', percent: 60, message: 'Encoding...' }}
@@ -156,8 +125,6 @@ describe('ConversionRunCard', () => {
   it('renders error message when error is set', () => {
     render(
       <ConversionRunCard
-        title="ProRes LT"
-        subtitle=""
         canRun={false}
         running={false}
         progress={null}
@@ -172,8 +139,6 @@ describe('ConversionRunCard', () => {
   it('renders result filename on completion', () => {
     render(
       <ConversionRunCard
-        title="ProRes LT"
-        subtitle=""
         canRun={false}
         running={false}
         progress={null}

@@ -151,10 +151,10 @@ export function MediaToAudioPanel() {
           pickLabel={selectedFiles.length > 0 ? "Change files" : "Select files"}
           onPick={pickFile}
           disabled={running}
+          actionTitle={`Convert to ${format.toUpperCase()}`}
+          actionSubtitle={format === "wav" ? "PCM 16-bit, 44.1 kHz stereo" : "LAME V0 MP3, 44.1 kHz stereo"}
         />
         <ConversionRunCard
-          title={`Convert to ${format.toUpperCase()}`}
-          subtitle={format === "wav" ? "PCM 16-bit, 44.1 kHz stereo" : "LAME V0 MP3, 44.1 kHz stereo"}
           canRun={selectedFiles.length > 0 && !running}
           running={running}
           progress={progress}

@@ -5,8 +5,6 @@ import type { BatchItemStatus } from "../../types/audio";
 import type { ConversionDone, ConversionProgress } from "../../types/conversion";
 
 export function ConversionRunCard({
-  title,
-  subtitle,
   canRun,
   running,
   progress,
@@ -16,8 +14,6 @@ export function ConversionRunCard({
   onRun,
   onCancel,
 }: {
-  title: string;
-  subtitle: string;
   canRun: boolean;
   running: boolean;
   progress: ConversionProgress | null;
@@ -33,12 +29,7 @@ export function ConversionRunCard({
 
   return (
     <div className={`conversion-card run-card ${error ? "is-error" : ""}`}>
-      <div className="conversion-run-head">
-        <div>
-          <small>Action</small>
-          <strong>{title}</strong>
-          <p>{subtitle}</p>
-        </div>
+      <div className="conversion-run-actions">
         {running && onCancel ? (
           <button type="button" className="conversion-run-btn is-cancel" onClick={onCancel}>
             <X size={17} strokeWidth={2.3} />

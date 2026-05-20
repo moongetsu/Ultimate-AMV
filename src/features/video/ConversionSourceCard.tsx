@@ -9,6 +9,8 @@ export function ConversionSourceCard({
   pickLabel,
   onPick,
   disabled,
+  actionTitle,
+  actionSubtitle,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -16,6 +18,8 @@ export function ConversionSourceCard({
   pickLabel: string;
   onPick: () => void;
   disabled: boolean;
+  actionTitle?: string;
+  actionSubtitle?: string;
 }) {
   const selectedLabel = selectedFiles.length > 1
     ? `${selectedFiles.length} files selected`
@@ -25,10 +29,17 @@ export function ConversionSourceCard({
   return (
     <div className="conversion-card source-card">
       <span className="conversion-icon">{icon}</span>
-      <div>
+      <div className="source-card-info">
         <small>{label}</small>
         <strong>{selectedLabel}</strong>
         {selectedPathLabel && <p>{selectedPathLabel}</p>}
+        {actionTitle && (
+          <div className="source-card-action">
+            <small>Action</small>
+            <strong>{actionTitle}</strong>
+            {actionSubtitle && <p>{actionSubtitle}</p>}
+          </div>
+        )}
       </div>
       <button type="button" className="conversion-pick-btn" onClick={onPick} disabled={disabled}>
         <FolderKanban size={16} strokeWidth={2.2} />

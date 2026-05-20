@@ -321,10 +321,10 @@ export function VideoToVideoPanel() {
           pickLabel={selectedFiles.length > 0 ? "Change videos" : "Select videos"}
           onPick={pickFile}
           disabled={running}
+          actionTitle={presetInfo.title}
+          actionSubtitle={presetInfo.subtitle}
         />
         <ConversionRunCard
-          title={presetInfo.title}
-          subtitle={presetInfo.subtitle}
           canRun={selectedFiles.length > 0 && !running && !(preset === "gpu-intra" && gpuIntraLocked)}
           running={running}
           progress={progress}

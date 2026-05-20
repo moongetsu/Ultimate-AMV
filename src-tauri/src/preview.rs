@@ -9,8 +9,8 @@ use serde_json::json;
 use tauri::Manager;
 
 use crate::{
-    app_root, canonical_input_path, cmd, ensure_tool, ffmpeg_listing, find_tool, log_error,
-    log_info, sanitize_path_segment, short_stable_id, H264_NVENC_AVAILABLE,
+    app_root, canonical_input_path, cmd, ensure_tool, find_tool, log_error,
+    log_info, sanitize_path_segment, short_stable_id,
 };
 
 #[derive(Serialize)]
@@ -160,8 +160,7 @@ fn generate_clip_preview(
         return serialize_clip_preview_done(job.scene_id, job.output, actual_duration, true);
     }
 
-    let use_gpu = *H264_NVENC_AVAILABLE
-        .get_or_init(|| ffmpeg_listing(&ffmpeg, "-encoders").contains("h264_nvenc"));
+    let use_gpu = false;
     render_single_preview_job(&ffmpeg, &job, use_gpu)?;
 
     let actual_duration = probe_webp_duration(&job.output).unwrap_or(job.duration);
@@ -245,8 +244,7 @@ fn generate_clip_preview_batch(
     let ffmpeg = find_tool(&root, "ffmpeg");
     ensure_tool(&ffmpeg)?;
 
-    let use_gpu = *H264_NVENC_AVAILABLE
-        .get_or_init(|| ffmpeg_listing(&ffmpeg, "-encoders").contains("h264_nvenc"));
+    let use_gpu = false;
     let mut items = Vec::with_capacity(jobs.len());
     let mut pending: Vec<ResolvedClipPreviewJob> = Vec::new();
 

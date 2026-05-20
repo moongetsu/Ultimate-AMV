@@ -5,6 +5,114 @@ All notable changes to Ultimate AMV are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] : 2026-05-20
+
+### Added
+- **Live wallpaper.** Background customizer in Settings can now
+  take a video file (mp4 / webm / mkv) instead of just an image,
+  and the app will loop it as the desktop wallpaper layer behind
+  every panel. The video is muted, plays at low priority, and
+  pauses when the app window is minimized so it does not chew
+  battery in the background.
+- **Hover-to-play clip previews.** Hovering a clip tile in the
+  Clip Hunting grid now plays the scene's audio-less preview
+  inline without opening the modal, so you can scan a long
+  episode without clicking each tile. Off by default : opt in
+  from Settings → Clip Hunting. Setting persists across restarts.
+- **Settings tabs.** The Settings panel got reorganized into
+  per-feature tabs (Appearance, Background, Clip Hunting, Vocal
+  Extraction, Downloader, Discord, Updates) so it stops being a
+  single scrolling page. A single Save button at the bottom
+  commits every change at once : no per-section saves, no
+  immediate-save toggles.
+- **Confirmation modals for destructive actions.** Clearing the
+  clip preview cache, wiping the download history, and the new
+  "wipe everything" full-cache reset all prompt for confirmation
+  before running, with a one-line summary of what is about to be
+  deleted.
+- **Logs tab rebuild.** The Logs page now has a stats bar at the
+  top with counts for Info / Warn / Error (click any of them to
+  filter), a search bar, a category dropdown (clip, audio,
+  downloader, etc.), and an Export button that opens a native
+  Save As dialog and writes the currently-filtered lines to a
+  .txt file with an auto-generated filename like
+  `[Ultimate AMV] Error Logs (2026-05-20 19-20-15).txt`.
+  Individual log lines with details are collapsible.
+- **Floating pill for export progress.** The clip export modal
+  can now minimize to a small floating pill in the corner of the
+  window so the app stays usable while a long export runs.
+  Clicking the pill restores the full modal.
+- **AniWaves provider + Custom URL option.** The anime browser
+  provider selector got reworked into a styled dropdown with
+  AniWaves as an additional source and a "Custom URL" entry that
+  unlocks the address bar so you can point it at an arbitrary
+  site.
+- **Custom dropdown component** used by the new anime provider
+  selector, the Settings selectors, and the new Logs category
+  filter. Keyboard navigation, search inside the menu, and
+  accessibility roles match the rest of the app.
+
+### Changed
+- **Scene preview modal opens in ~500ms instead of 5 to 10
+  seconds.** Three stacked changes : ffmpeg now seeks with a
+  coarse pre-input `-ss` (keyframe jump) plus a precise
+  post-input `-ss` (frame-accurate cut), instead of walking the
+  whole file from t=0; ffmpeg gets warmed up on app launch so
+  the first click of every session no longer pays a 1 to 2
+  second cold-start tax; and the animated WebP thumbnail is
+  shown as a darkened poster behind the spinner while the mp4
+  renders, so the click feels instant even on slow paths.
+- **Custom app-wide scrollbar.** Replaces the default Windows
+  scrollbar that used to bleed through the dark theme. Matches
+  the accent color and tucks out of the way when not hovered.
+- **Mode-switcher auto-collapses with a single tab.** Tools that
+  only have one mode (no CPU/GPU switcher, no second tab) no
+  longer render an empty tab strip above the panel.
+- **CSS split into per-feature files.** The 6800-line
+  `styles.css` was broken up into eight files (base, shell,
+  components, modals, audio, clips, downloader, anime) which
+  cuts dev-tool load time and stops large diffs from touching
+  unrelated styling.
+- **Rust backend split into per-feature modules.** `lib.rs` was
+  decomposed into `clips.rs`, `downloads.rs`, `preview.rs`,
+  `video_cmds.rs`, `tools.rs`, etc. No user-visible behavior
+  change : same commands, same logs, just easier to navigate
+  and fewer merge conflicts when multiple changes land at once.
+
+### Fixed
+- **Non-ASCII filenames no longer crash the Python backend.**
+  Files with Japanese characters, full-width brackets `【】`,
+  curly quotes, em-dashes in titles, and similar would crash
+  clip extraction and audio extraction with `UnicodeDecodeError`
+  on Windows. The Rust shell now sets `PYTHONUTF8=1` and
+  `PYTHONIOENCODING=utf-8` on every Python sidecar it spawns,
+  and `audio_cli.py` / `clip_cli.py` reconfigure stdin/stdout/
+  stderr to UTF-8 at startup as a belt-and-suspenders.
+- **Hover-to-play preview defaults to off.** The first build
+  that shipped hover-to-play had it on by default and the
+  scrubbing motion across a grid of clips was distracting on
+  long episodes. New default is off; existing users with it
+  explicitly enabled keep their setting.
+- **Cancel flow shows a clearer message.** Cancelling a clip
+  extraction mid-run used to leave the panel sitting on
+  "Working..." with no acknowledgement that anything happened.
+  It now shows "Cancelled : N clips kept" so you know the
+  partial results are preserved.
+- **Static clip thumbnails as an alternative.** The animated
+  WebP grid is great for skimming but expensive to render on
+  long episodes; a Settings toggle now switches the grid to
+  static first-frame thumbnails for lower CPU on weak machines.
+- **Full cache wipe.** A new "Clear all caches" button in
+  Settings → Updates wipes scene clip cache, WebP previews, and
+  yt-dlp download fragments in one shot, for when partial
+  clears do not get a system back to a clean state.
+- **Thumbnail layering during transitions.** Clip thumbnails
+  briefly stacked on top of each other while the grid
+  re-rendered after a filter change; they now cross-fade
+  cleanly.
+
+[0.11.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.11.0
+
 ## [0.10.0] : 2026-05-19
 
 ### Added

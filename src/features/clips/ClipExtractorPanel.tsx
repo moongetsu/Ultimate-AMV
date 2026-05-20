@@ -107,6 +107,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   const [exportSession, setExportSession] = React.useState<ClipExportSession | null>(null);
   const [exportMinimized, setExportMinimized] = React.useState(false);
   const exportSessionRef = React.useRef<ClipExportSession | null>(null);
+  const lastSelectedIdRef = React.useRef<string | null>(null);
   React.useEffect(() => {
     exportSessionRef.current = exportSession;
     if (!exportSession) setExportMinimized(false);
@@ -758,6 +759,23 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     [selectedVideos, convertedSources],
   );
 
+  function selectClip(clipId: string) {
+    setSelectedClipIds((current) => {
+      const next = new Set(current);
+      next.add(clipId);
+      return next;
+    });
+    lastSelectedIdRef.current = clipId;
+  }
+
+  function deselectClip(clipId: string) {
+    setSelectedClipIds((current) => {
+      const next = new Set(current);
+      next.delete(clipId);
+      return next;
+    });
+  }
+
   function toggleClipSelection(clipId: string) {
     setSelectedClipIds((current) => {
       const next = new Set(current);
@@ -768,6 +786,25 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
       }
       return next;
     });
+    lastSelectedIdRef.current = clipId;
+  }
+
+  function selectRange(fromId: string, toId: string, addToExisting = false) {
+    const fromIndex = clips.findIndex((c) => c.id === fromId);
+    const toIndex = clips.findIndex((c) => c.id === toId);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const start = Math.min(fromIndex, toIndex);
+    const end = Math.max(fromIndex, toIndex);
+
+    setSelectedClipIds((current) => {
+      const next = addToExisting ? new Set(current) : new Set<string>();
+      for (let i = start; i <= end; i++) {
+        next.add(clips[i].id);
+      }
+      return next;
+    });
+    lastSelectedIdRef.current = toId;
   }
 
   function toggleAllClipSelection() {
@@ -780,14 +817,41 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     });
   }
 
-  function handleClipClick(clip: ClipPreviewItem) {
+  function handleClipClick(
+    clip: ClipPreviewItem,
+    modifiers: { ctrl: boolean; shift: boolean; doubleClick: boolean },
+  ) {
     if (mergeMode) {
       toggleMergeOrder(clip.id);
-    } else {
-      // Tile click opens the scene viewer with audio. Selection lives on the
-      // corner button (clip-corner-select) so the two actions don't collide.
-      setViewerClipId(clip.id);
+      return;
     }
+
+    // Double click: select only (no preview)
+    if (modifiers.doubleClick) {
+      selectClip(clip.id);
+      return;
+    }
+
+    // Ctrl+Shift+click: add range to existing selection
+    if (modifiers.ctrl && modifiers.shift && lastSelectedIdRef.current) {
+      selectRange(lastSelectedIdRef.current, clip.id, true);
+      return;
+    }
+
+    // Ctrl+click: toggle selection
+    if (modifiers.ctrl) {
+      toggleClipSelection(clip.id);
+      return;
+    }
+
+    // Shift+click: range selection (replaces current selection)
+    if (modifiers.shift && lastSelectedIdRef.current) {
+      selectRange(lastSelectedIdRef.current, clip.id, false);
+      return;
+    }
+
+    // Single click without modifiers: just preview
+    setViewerClipId(clip.id);
   }
 
   function toggleMergeOrder(clipId: string) {
@@ -1344,7 +1408,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
                     selected={mergeMode ? mergePositions.has(clip.id) : selectedClipIds.has(clip.id)}
                     activationEpoch={activationEpoch}
                     clipHoverPreview={hoverPlayOnly}
-                    onClick={() => handleClipClick(clip)}
+                    onClick={(modifiers) => handleClipClick(clip, modifiers)}
                     onToggleSelect={() =>
                       mergeMode ? toggleMergeOrder(clip.id) : toggleClipSelection(clip.id)
                     }

@@ -258,6 +258,20 @@ fn discord_clear() {
     discord::clear();
 }
 
+#[tauri::command]
+fn write_file(path: String, content: String) -> Result<(), String> {
+    use std::fs::File;
+    use std::io::Write;
+    
+    log_info("fs.write_file.start", "Writing file", json!({ "path": &path }));
+    
+    let mut file = File::create(&path).map_err(|e| e.to_string())?;
+    file.write_all(content.as_bytes()).map_err(|e| e.to_string())?;
+    
+    log_info("fs.write_file.done", "File written successfully", Value::Null);
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     reset_app_logs();
@@ -356,7 +370,8 @@ pub fn run() {
             tools::tools_install,
             tools::tools_cancel,
             discord_set_state,
-            discord_clear
+            discord_clear,
+            write_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

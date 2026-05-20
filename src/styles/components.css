@@ -19,11 +19,68 @@
 .logs-panel {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
   gap: 10px;
   padding: 14px 18px 18px;
 }
 
+/* Stats Bar */
+.logs-stats {
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.log-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 12px;
+  color: #a0aab4;
+}
+
+.log-stat:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #d5dde4;
+}
+
+.log-stat.is-active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.log-stat.is-info.is-active {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.log-stat.is-warn.is-active {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+.log-stat.is-error.is-active {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.log-stat-count {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.log-stat-label {
+  font-weight: 500;
+}
+
+/* Toolbar */
 .logs-toolbar {
   min-height: 34px;
   display: flex;
@@ -33,6 +90,64 @@
   color: var(--muted);
   font-size: 12px;
   font-weight: 720;
+}
+
+.logs-search {
+  flex: 1;
+  max-width: 320px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.logs-search-icon {
+  position: absolute;
+  left: 10px;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.logs-search-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 32px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #d5dde4;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.logs-search-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.logs-search-input::placeholder {
+  color: #6b7280;
+}
+
+.logs-search-clear {
+  position: absolute;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+}
+
+.logs-search-clear:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
 }
 
 .logs-actions {
@@ -52,12 +167,20 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .logs-toolbar button:hover {
   color: var(--theme-accent-contrast);
   border-color: transparent;
   background: var(--accent-gradient);
+}
+
+.logs-toolbar button.is-active {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .logs-toolbar button.logs-clear-button {
@@ -89,19 +212,278 @@
   background: rgba(255, 41, 74, 0.1);
 }
 
+/* Filters Panel */
+.logs-filters {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.logs-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logs-filter-group label {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+/* Custom Dropdown */
+.custom-dropdown {
+  position: relative;
+  min-width: 140px;
+}
+
+.custom-dropdown-trigger {
+  width: 100%;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #d5dde4;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+
+.custom-dropdown-trigger:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.custom-dropdown-chevron {
+  transition: transform 0.2s ease;
+  color: #9ca3af;
+}
+
+.custom-dropdown-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.custom-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #1f1f28;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.custom-dropdown-item {
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #d5dde4;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  transition: all 0.1s ease;
+}
+
+.custom-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.custom-dropdown-item.is-selected {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.custom-dropdown-item.is-selected svg {
+  color: #60a5fa;
+}
+
+.logs-clear-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 4px 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #9ca3af;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.logs-clear-filters:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* Results Info */
+.logs-results-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #6b7280;
+  padding: 0 4px;
+}
+
+.logs-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.logs-clear-filters-btn {
+  margin-top: 12px;
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #d5dde4;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.logs-clear-filters-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Terminal Log */
 .terminal-log {
   min-height: 0;
   overflow: auto;
   margin: 0;
-  padding: 14px;
+  padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 10px;
   color: #d5dde4;
   background: rgba(5, 7, 8, 0.55);
   font-family: "JetBrains Mono", "Cascadia Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Individual Log Lines */
+.log-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: default;
+  transition: background 0.1s ease;
+}
+
+.log-line:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.log-line.log-level-error:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.log-line.log-level-warn:hover {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.log-timestamp {
+  color: #6b7280;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.log-level-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.log-level-badge.log-level-info {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.log-level-badge.log-level-warn {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.log-level-badge.log-level-error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.log-level-badge.log-level-unknown {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+}
+
+.log-event {
+  color: #a78bfa;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.log-message {
+  color: #d5dde4;
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.log-details-toggle {
+  color: #6b7280;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.log-details {
+  width: 100%;
+  margin: 4px 0 4px 24px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: #9ca3af;
+  font-size: 11px;
   white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* ============================================================

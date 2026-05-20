@@ -1259,7 +1259,11 @@ pub(crate) fn sanitize_path_segment(value: &str, fallback: &str, max_len: usize)
         sanitized = fallback.to_string();
     }
     if sanitized.len() > max_len {
-        sanitized.truncate(max_len);
+        let mut new_len = max_len;
+        while new_len > 0 && !sanitized.is_char_boundary(new_len) {
+            new_len -= 1;
+        }
+        sanitized.truncate(new_len);
         sanitized = sanitized.trim_matches([' ', '.']).to_string();
     }
     if sanitized.is_empty() {

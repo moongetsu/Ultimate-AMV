@@ -21,8 +21,18 @@ pub(crate) fn canonical_input_path(input_path: &str) -> Result<PathBuf, String> 
     if !path.is_file() {
         return Err(format!("Input file not found: {}", path.to_string_lossy()));
     }
-    path.canonicalize()
-        .map_err(|error| format!("Could not read input path: {error}"))
+    let canonicalized = path.canonicalize()
+        .map_err(|error| format!("Could not read input path: {error}"))?;
+
+    #[cfg(target_os = "windows")]
+    {
+        let path_str = canonicalized.to_string_lossy();
+        if path_str.starts_with(r"\\?\") {
+            return Ok(PathBuf::from(&path_str[4..]));
+        }
+    }
+
+    Ok(canonicalized)
 }
 
 pub(crate) fn ensure_tool(path: &Path) -> Result<(), String> {

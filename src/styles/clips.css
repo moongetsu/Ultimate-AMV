@@ -1,14 +1,543 @@
 /* ============================================================
-   17. CLIP EXTRACTOR PANEL
+   17. CLIP EXTRACTOR PANEL - DUAL SIDEBAR MODERN LAYOUT
    ============================================================ */
 
 .clip-extractor {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr) 260px;
+  background: transparent;
+  gap: 1px;
+  background: var(--line);
+}
+
+.clip-extractor > * {
+  background: #020203;
+}
+
+/* Sidebars */
+.clip-sidebar {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.clip-sidebar-left {
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.clip-sidebar-right {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+/* Sidebar Section */
+.clip-sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.clip-sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.clip-sidebar-title svg {
+  color: var(--cyan);
+}
+
+/* Left Sidebar - Import */
+.clip-import-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  background: transparent;
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clip-import-btn:hover {
+  border-color: var(--cyan);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+
+.clip-video-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.clip-video-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+}
+
+.clip-video-num {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  color: var(--theme-accent-contrast);
+  font-size: 10px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.clip-video-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.clip-video-converted {
+  color: #fbbf24;
+  font-size: 12px;
+}
+
+.clip-server-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.clip-server-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.clip-server-dot.is-ready {
+  background: #4ade80;
+  box-shadow: 0 0 8px #4ade80;
+}
+
+.clip-server-dot.is-warming {
+  background: #fbbf24;
+  animation: pulse 1.5s ease infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* View Controls */
+.clip-view-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.clip-view-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.clip-view-toggle {
+  width: 38px;
+  height: 20px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.clip-view-toggle span {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.15s ease;
+  transform: translateX(0);
+}
+
+.clip-view-toggle.is-on {
+  background: transparent;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--accent-border-strong);
+}
+
+.clip-view-toggle.is-on span {
+  transform: translateX(18px);
+  background: var(--cyan);
+}
+
+.clip-cols-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.clip-cols-selector small {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.clip-cols-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.clip-cols-pills button {
+  flex: 1;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.clip-cols-pills button:hover {
+  border-color: var(--accent-border);
+  color: var(--cyan);
+}
+
+.clip-cols-pills button.is-active {
+  background: transparent;
+  border-color: var(--cyan);
+  color: white;
+  box-shadow: 0 0 0 1px var(--accent-border-strong);
+}
+
+/* Main Extract Button */
+.clip-extract-main {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  background: transparent;
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clip-extract-main:hover {
+  border-color: var(--cyan);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+
+.clip-extract-main:disabled {
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--muted);
+  cursor: not-allowed;
+  transform: none;
   background: transparent;
 }
+
+.clip-extract-main .spin {
+  animation: spin 1s linear infinite;
+}
+
+.clip-extract-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.clip-extract-cancel:hover {
+  color: #ff6d91;
+  border-color: rgba(255, 109, 145, 0.3);
+}
+
+/* Right Sidebar - Status & Export */
+.clip-status-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.clip-status-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.clip-status-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--theme-accent-contrast);
+}
+
+.clip-status-info small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.clip-mini-progress {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.clip-mini-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-gradient);
+  transition: width 0.2s ease;
+}
+
+/* Export Box */
+.clip-export-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.clip-export-dropdown {
+  width: 100%;
+}
+
+.clip-export-note {
+  color: #fbbf24;
+  font-size: 10px;
+}
+
+.clip-export-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(99, 230, 162, 0.08);
+  color: #86efac;
+  font-size: 11px;
+}
+
+.clip-export-tip svg {
+  flex-shrink: 0;
+}
+
+/* Actions Panel */
+.clip-actions-panel {
+  gap: 8px;
+}
+
+.clip-export-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border: 2px solid var(--cyan);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--cyan);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clip-export-action.primary {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.clip-export-action:hover:not(:disabled) {
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+
+.clip-export-action:disabled {
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.clip-action-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+}
+
+.clip-action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.clip-action-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.clip-action-secondary:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.clip-action-secondary.active {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: transparent;
+}
+
+.clip-action-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  font-size: 12px;
+}
+
+/* Help Section */
+.clip-help-box {
+  margin-top: auto;
+}
+
+.clip-help-bordered {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.clip-help-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.clip-help-item svg {
+  color: var(--cyan);
+  flex-shrink: 0;
+}
+
+.clip-help-item kbd {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Old help styles - kept for compatibility */
+.clip-help {
+  margin-top: auto;
+}
+
+.clip-help-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clip-help-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.clip-help-list kbd {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* Old styles kept for compatibility */
 
 .clip-extractor-rail {
   min-width: 0;
@@ -1032,5 +1561,383 @@
   color: var(--muted);
   font-size: 13px;
   font-weight: 680;
+}
+
+/* ============================================================
+   NEW: COLLAPSIBLE SECTIONS (Cleaner UI)
+   ============================================================ */
+
+/* Section container */
+.clip-section {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+/* Section header (clickable) */
+.clip-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.clip-section-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.clip-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.clip-section-title svg {
+  color: var(--cyan);
+}
+
+.clip-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-gradient);
+  color: var(--theme-accent-contrast);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.clip-section-chevron {
+  font-size: 11px;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+}
+
+.clip-section-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/* Section content */
+.clip-section-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+/* Compact Import Section */
+.clip-import-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.clip-import-text strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.clip-import-text small {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.clip-source-mini {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.clip-source-name {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clip-server-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+
+.clip-server-dot.is-ready {
+  background: #4ade80;
+  box-shadow: 0 0 8px #4ade80;
+}
+
+.clip-server-dot.is-warming {
+  background: #fbbf24;
+  animation: pulse 1.5s ease infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Toggle Switch */
+.clip-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.clip-toggle {
+  width: 40px;
+  height: 22px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  position: relative;
+}
+
+.clip-toggle.is-on {
+  background: var(--accent-gradient);
+  border-color: transparent;
+}
+
+.clip-toggle-knob {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  display: block;
+  transition: transform 0.15s ease;
+  transform: translateX(0);
+}
+
+.clip-toggle.is-on .clip-toggle-knob {
+  transform: translateX(18px);
+}
+
+/* Compact Columns */
+.clip-cols-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.clip-cols-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.clip-cols-buttons button {
+  width: 32px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.clip-cols-buttons button:hover {
+  border-color: var(--accent-border);
+  color: var(--cyan);
+}
+
+.clip-cols-buttons button.is-active {
+  background: var(--accent-gradient);
+  border-color: transparent;
+  color: var(--theme-accent-contrast);
+}
+
+/* Settings warning */
+.clip-setting-warning {
+  color: #fbbf24;
+  font-size: 11px;
+}
+
+.clip-format-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.clip-format-tip svg {
+  color: var(--cyan);
+}
+
+/* Action Buttons */
+.clip-actions-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.clip-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clip-action-btn:hover {
+  border-color: var(--accent-border);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.clip-action-btn.primary {
+  grid-column: 1 / -1;
+  background: var(--accent-gradient);
+  border-color: transparent;
+  color: var(--theme-accent-contrast);
+}
+
+.clip-action-btn.primary:hover {
+  filter: brightness(1.1);
+}
+
+.clip-action-btn.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clip-action-btn.is-active {
+  border-color: var(--cyan);
+  background: rgba(99, 230, 162, 0.1);
+}
+
+/* Compact Status Card */
+.clip-status-card {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.clip-status-card.is-error {
+  border-color: rgba(255, 109, 145, 0.3);
+  background: rgba(255, 109, 145, 0.05);
+}
+
+.clip-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.clip-status-header strong {
+  font-weight: 700;
+}
+
+.clip-status-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.clip-status-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-gradient);
+  transition: width 0.2s ease;
+}
+
+/* Primary Extract Button */
+.clip-extract-btn {
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent-gradient);
+  color: var(--theme-accent-contrast);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.clip-extract-btn:hover {
+  filter: brightness(1.1);
+}
+
+.clip-extract-btn:active {
+  transform: scale(0.98);
+}
+
+.clip-extract-btn:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.clip-extract-btn .spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Cancel Button */
+.clip-cancel-btn {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.clip-cancel-btn:hover {
+  color: #ff6d91;
+  border-color: rgba(255, 109, 145, 0.3);
 }
 

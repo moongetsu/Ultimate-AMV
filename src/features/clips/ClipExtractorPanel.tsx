@@ -2,7 +2,7 @@ import React from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowRight, CheckCircle2, Clapperboard, Film, Info, Loader2, Scissors, Upload, X, Zap } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clapperboard, Film, Info, Loader2, Scissors, Upload, X, Zap, ChevronDown, MousePointer2, MousePointerClick, Focus, Command } from "lucide-react";
 import { Dropdown } from "../../components/Dropdown";
 import { Virtuoso } from "react-virtuoso";
 import {
@@ -64,6 +64,17 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   }, []);
   const [gridCols, setGridCols] = React.useState(4);
   const [mergeMode, setMergeMode] = React.useState(false);
+  
+  // Collapsible sections state
+  const [sections, setSections] = React.useState({
+    view: true,     // Open by default
+    export: false,  // Closed until needed
+    actions: true,  // Open when clips exist
+  });
+  
+  function toggleSection(key: keyof typeof sections) {
+    setSections(prev => ({ ...prev, [key]: !prev[key] }));
+  }
   const [mergeOrder, setMergeOrder] = React.useState<string[]>([]);
   const [selectedClipIds, setSelectedClipIds] = React.useState<Set<string>>(() => new Set());
   const [exportFormat, setExportFormat] = React.useState<ClipExportFormat>("prores-lt");
@@ -1103,221 +1114,124 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
         <span>Drop video(s) to scan for clips</span>
         <small>MP4 · MKV · MOV · WEBM · AVI : multiple files accepted</small>
       </div>
-      <div className="clip-extractor-rail">
-        <button type="button" className="clip-import-button glass spring-motion" onClick={pickVideo}>
-          <span className="clip-import-mark">
-            <Scissors size={32} strokeWidth={1.9} />
-          </span>
-          <span>{selectedVideos.length > 0 ? "Change episodes" : "Select episodes"}</span>
-        </button>
 
-        <div className="clip-source-card glass">
-          <div className="clip-source-header">
-            <div className="clip-source-info">
-              <small>Source</small>
-              <strong>{displayName}</strong>
-            </div>
-          <div
-            className={`clip-server-badge spring-motion ${serverStatus === "ready" ? "is-ready" : serverStatus === "warming" ? "is-warming" : ""}`}
-            title={serverStatus === "ready" ? "Clip Server is warm and ready" : serverStatus === "warming" ? "Clip Server is warming up..." : "Clip Server is cold"}
-          >
-            {serverStatus === "ready" ? "Ready" : serverStatus === "warming" ? "Warming" : "Cold"}
-          </div>
-          </div>
+      {/* LEFT SIDEBAR: Source & Import */}
+      <div className="clip-sidebar clip-sidebar-left">
+        {/* Import Section */}
+        <div className="clip-sidebar-section">
+          <h3 className="clip-sidebar-title">
+            <Film size={16} />
+            Episodes
+          </h3>
+          
+          <button type="button" className="clip-import-btn" onClick={pickVideo}>
+            <Scissors size={18} />
+            {selectedVideos.length > 0 ? "Import Episode(s)" : "Import Episode(s)"}
+          </button>
+          
           {selectedVideos.length > 0 && (
-            <span>{selectedVideos.length === 1 ? selectedVideos[0] : selectedVideos.map(fileName).join(" / ")}</span>
+            <div className="clip-video-list">
+              {selectedVideos.map((path, i) => (
+                <div key={path} className="clip-video-item">
+                  <span className="clip-video-num">{i + 1}</span>
+                  <span className="clip-video-name" title={path}>{fileName(path)}</span>
+                  {convertedSources[path] && (
+                    <span className="clip-video-converted" title="Using converted copy">⚡</span>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
-          <em>{clipMode === "gpu" ? "GPU mode · RTX TransNetV2" : "CPU mode · PySceneDetect"}</em>
-          {convertedBadgeNames.length > 0 && (
-            <span className="clip-compat-badge" title="The clip extractor is reading a converted copy stored in the app's cache. The original file is untouched.">
-              {convertedBadgeNames.length === 1
-                ? `Using converted copy of ${convertedBadgeNames[0]}`
-                : `Using converted copies for ${convertedBadgeNames.length} files`}
-            </span>
-          )}
+          
+          <div className="clip-server-status">
+            <span className={`clip-server-dot ${serverStatus === "ready" ? "is-ready" : serverStatus === "warming" ? "is-warming" : ""}`} />
+            <small>
+              {serverStatus === "ready" ? "Server ready" : serverStatus === "warming" ? "Warming up..." : "Server cold"}
+              {clipMode === "gpu" ? " · GPU" : " · CPU"}
+            </small>
+          </div>
         </div>
 
-        <div className="clip-tool-stack" aria-label="Clip extractor actions">
-          <button
-            type="button"
-            className={`clip-tool-button spring-motion ${gridPreview ? "is-active" : ""}`}
-            onClick={() => setGridPreview((value) => !value)}
-          >
-            <Film size={18} strokeWidth={2} />
-            <span>Grid preview</span>
-          </button>
-
-          <button
-            type="button"
-            className={`clip-tool-button spring-motion ${hoverPlayOnly ? "is-active" : ""}`}
-            onClick={() => {
-              const next = !hoverPlayOnly;
-              setHoverPlayOnly(next);
-              void invoke("set_config", { key: "clip_hover_preview", value: next ? "true" : "false" });
-              window.dispatchEvent(
-                new CustomEvent("clip-hover-preview-changed", { detail: { enabled: next } }),
-              );
-            }}
-            title={hoverPlayOnly ? "Only plays previews on hover (Lighter on system)" : "Plays all visible previews simultaneously"}
-          >
-            <Zap size={18} strokeWidth={2} />
-            <span>Hover preview only</span>
-          </button>
-
-          <div className="clip-cols-control">
-            <div className="clip-cols-label">
-              <span>Columns</span>
-              <strong>{gridCols}</strong>
-            </div>
-            <input
-              type="range"
-              className="clip-cols-slider"
-              min={1}
-              max={4}
-              step={1}
-              value={gridCols}
-              onChange={(e) => setGridCols(Math.min(4, Math.max(1, Number(e.currentTarget.value))))}
-              aria-label="Grid column count"
-            />
-            <div className="clip-cols-ticks">
-              {CLIP_COLUMN_OPTIONS.map((n) => (
+        {/* View Controls */}
+        <div className="clip-sidebar-section">
+          <h3 className="clip-sidebar-title">
+            <Zap size={16} />
+            Grid View
+          </h3>
+          
+          <div className="clip-view-grid">
+            <label className="clip-view-label">
+              <span>Preview all</span>
+              <button 
+                type="button" 
+                className={`clip-view-toggle ${gridPreview ? 'is-on' : ''}`}
+                onClick={() => setGridPreview(v => !v)}
+              >
+                <span />
+              </button>
+            </label>
+            
+            <label className="clip-view-label">
+              <span>Hover only</span>
+              <button 
+                type="button" 
+                className={`clip-view-toggle ${hoverPlayOnly ? 'is-on' : ''}`}
+                onClick={() => {
+                  const next = !hoverPlayOnly;
+                  setHoverPlayOnly(next);
+                  void invoke("set_config", { key: "clip_hover_preview", value: next ? "true" : "false" });
+                  window.dispatchEvent(new CustomEvent("clip-hover-preview-changed", { detail: { enabled: next } }));
+                }}
+              >
+                <span />
+              </button>
+            </label>
+          </div>
+          
+          <div className="clip-cols-selector">
+            <small>Columns</small>
+            <div className="clip-cols-pills">
+              {[2, 3, 4, 6].map(n => (
                 <button
                   key={n}
                   type="button"
-                  className={`clip-cols-tick ${gridCols === n ? "is-active" : ""}`}
+                  className={gridCols === n ? 'is-active' : ''}
                   onClick={() => setGridCols(n)}
-                  aria-label={`${n} column${n === 1 ? "" : "s"}`}
-                >{n}</button>
+                >
+                  {n}
+                </button>
               ))}
             </div>
           </div>
-
-          <div className="clip-cols-control">
-            <div className="clip-cols-label">
-              <span>Export Format</span>
-            </div>
-            <Dropdown<ClipExportFormat>
-              value={exportFormat}
-              onChange={(next) => setExportFormat(next)}
-              options={dropdownOptions}
-              className="clip-export-format-dropdown"
-            />
-            {selectedExportOption?.reason && <small className="stream-warning">{selectedExportOption.reason}</small>}
-            {qualitySpec && (
-              <VideoOutputControl
-                spec={qualitySpec}
-                value={exportQuality[exportFormat] || qualitySpec.defaultValue}
-                disabled={isExtracting}
-                onChange={(value) => {
-                  const clamped = clampNumber(value, qualitySpec.min, qualitySpec.max);
-                  setExportQuality((current) => ({ ...current, [exportFormat]: clamped }));
-                }}
-              />
-            )}
-          </div>
-
-          {!mergeMode && (
-            <>
-              <button
-                type="button"
-                className={`clip-tool-button spring-motion ${selectedCount > 0 ? 'is-active-primary' : ''}`}
-                disabled={selectedCount === 0 || isExtracting}
-                onClick={startExport}
-              >
-                <ArrowRight size={18} strokeWidth={2} />
-                <span>{selectedCount === 0 ? "Select clips to export" : `Export ${selectedCount} clips`}</span>
-              </button>
-
-              <button
-                type="button"
-                className={`clip-tool-button spring-motion ${hasClips && selectedCount === clips.length ? "is-active" : ""}`}
-                disabled={!hasClips || isExtracting}
-                onClick={toggleAllClipSelection}
-              >
-                <CheckCircle2 size={18} strokeWidth={2} />
-                <span>{hasClips && selectedCount === clips.length ? "Clear selection" : "Select all clips"}</span>
-              </button>
-            </>
-          )}
-
-          <button
-            type="button"
-            className={`clip-tool-button spring-motion ${mergeMode ? "is-active" : ""}`}
-            disabled={!hasClips}
-            onClick={toggleMergeMode}
-          >
-            <Scissors size={18} strokeWidth={2} />
-            <span>{mergeMode ? "Cancel merge" : "Merge clip"}</span>
-          </button>
-
-          {mergeMode && (
-            <button
-              type="button"
-              className="clip-confirm-button spring-motion accent-glow"
-              disabled={mergeOrder.length < 2 || isExtracting}
-              onClick={startMergeExport}
-              title={mergeOrder.length < 2 ? "Select at least 2 clips to merge" : `Merge into ${mergeFilenameStem}.mov`}
-            >
-              <CheckCircle2 size={17} strokeWidth={2.1} />
-              <span>
-                {mergeOrder.length < 2
-                  ? "Select 2+ clips"
-                  : `Merge into ${mergeFilenameStem}.mov`}
-              </span>
-            </button>
-          )}
         </div>
 
-        {!exportSession && (progress || error || result) && (
-          <div className={`clip-run-card glass ${error ? "is-error" : ""}`}>
-            <div className="clip-run-line">
-              <strong>{error ? "Extraction failed" : formatClipProgressStage(progress?.stage)}</strong>
-              {progress && <span>{Math.round(progress.percent)}%</span>}
-            </div>
-            {progress && (
-              <div className={`clip-progress-track ${isExtracting && progress.percent <= 0 ? "is-indeterminate" : ""}`}>
-                <span className="spring-motion" style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }} />
-              </div>
-            )}
-            <p>{runMessage}</p>
-          </div>
-        )}
-
-        <div className="clip-format-note">
-          <Info size={14} strokeWidth={2.5} />
-          <span>ProRes and Intra frame formats are best for After Effects responsiveness.</span>
-        </div>
-
-        <button type="button" className="clip-primary-action spring-motion accent-glow" disabled={!canExtract} onClick={() => void startExtraction()}>
-          {isExtracting ? "Extracting..." : hasClips ? "Extract again" : "Extract clips"}
+        {/* Extract Button */}
+        <button 
+          type="button" 
+          className="clip-extract-main" 
+          disabled={!canExtract} 
+          onClick={() => void startExtraction()}
+        >
+          {isExtracting ? (
+            <><Loader2 size={18} className="spin" /> Scanning...</>
+          ) : hasClips ? (
+            <><Clapperboard size={18} /> Rescan</>
+          ) : (
+            <><Film size={18} /> Find Clips</>
+          )}
         </button>
+        
         {isExtracting && !exportSession && (
-          <button
-            type="button"
-            className="clip-cancel-action"
-            onClick={() => {
-              clipCancellingRef.current = true;
-              void invoke("cancel_clip");
-              clipAbortRef.current?.(new Error("USER_CANCELLED"));
-              clipAbortRef.current = null;
-            }}
-          >
-            <X size={14} strokeWidth={2.3} />
-            Cancel
-          </button>
-        )}
-        {isExtracting && !exportSession && !isConverting && (
-          <button
-            type="button"
-            className="clip-convert-suggest"
-            onClick={() => openCompatModalForCurrent()}
-            title="If this is taking too long, the source may use a codec the extractor can't read. Convert it to a compatible format."
-          >
-            Stuck? Convert to compatible format
+          <button type="button" className="clip-extract-cancel" onClick={() => {
+            clipCancellingRef.current = true;
+            void invoke("cancel_clip");
+          }}>
+            <X size={14} /> Cancel
           </button>
         )}
       </div>
 
+      {/* CENTER: Clip Grid */}
       <div className="clip-extractor-stage">
         {hasClips ? (
           <Virtuoso
@@ -1449,6 +1363,158 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
             )}
           </div>
         )}
+      </div>
+
+      {/* RIGHT SIDEBAR: Export & Actions */}
+      <div className="clip-sidebar clip-sidebar-right">
+        {/* Status / Info */}
+        <div className="clip-sidebar-section">
+          <h3 className="clip-sidebar-title">
+            <Info size={16} />
+            Status
+          </h3>
+          
+          {!hasClips ? (
+            <div className="clip-status-info">
+              <span className="clip-status-label">No clips loaded</span>
+              <small>Import an episode to find clips</small>
+            </div>
+          ) : (
+            <div className="clip-status-info">
+              <span className="clip-status-value">{clips.length} clips found</span>
+              <small>{selectedCount} selected · {readyPreviewCount} ready</small>
+              {progress && progress.percent < 100 && (
+                <div className="clip-mini-progress">
+                  <div className="clip-mini-bar" style={{ width: `${progress.percent}%` }} />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Export Settings - Only show when clips exist */}
+        {hasClips && (
+          <div className="clip-sidebar-section">
+            <h3 className="clip-sidebar-title">
+              <ArrowRight size={16} />
+              Export Settings
+            </h3>
+            
+            <div className="clip-export-box">
+              <Dropdown<ClipExportFormat>
+                value={exportFormat}
+                onChange={(next) => setExportFormat(next)}
+                options={dropdownOptions}
+                className="clip-export-dropdown"
+              />
+              
+              {selectedExportOption?.reason && (
+                <small className="clip-export-note">{selectedExportOption.reason}</small>
+              )}
+              
+              {qualitySpec && (
+                <VideoOutputControl
+                  spec={qualitySpec}
+                  value={exportQuality[exportFormat] || qualitySpec.defaultValue}
+                  disabled={isExtracting}
+                  onChange={(value) => {
+                    const clamped = clampNumber(value, qualitySpec.min, qualitySpec.max);
+                    setExportQuality(current => ({ ...current, [exportFormat]: clamped }));
+                  }}
+                />
+              )}
+            </div>
+            
+            <div className="clip-export-tip">
+              <Info size={12} />
+              <span>ProRes is best for After Effects</span>
+            </div>
+          </div>
+        )}
+
+        {/* Actions - Only show when clips exist */}
+        {hasClips && (
+          <div className="clip-sidebar-section clip-actions-panel">
+            {!mergeMode ? (
+              <>
+                <button
+                  type="button"
+                  className="clip-export-action primary"
+                  disabled={selectedCount === 0 || isExtracting}
+                  onClick={startExport}
+                >
+                  <ArrowRight size={18} />
+                  Export {selectedCount > 0 && <span className="clip-action-badge">{selectedCount}</span>}
+                </button>
+                
+                <div className="clip-action-row">
+                  <button
+                    type="button"
+                    className="clip-action-secondary"
+                    onClick={toggleAllClipSelection}
+                  >
+                    {selectedCount === clips.length ? 'Deselect' : 'Select All'}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    className={`clip-action-secondary ${mergeMode ? 'active' : ''}`}
+                    onClick={toggleMergeMode}
+                  >
+                    <Scissors size={14} />
+                    Merge
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="clip-export-action primary"
+                  disabled={mergeOrder.length < 2 || isExtracting}
+                  onClick={startMergeExport}
+                >
+                  <CheckCircle2 size={18} />
+                  Merge {mergeOrder.length > 0 && `(${mergeOrder.length})`}
+                </button>
+                
+                <button
+                  type="button"
+                  className="clip-action-secondary"
+                  onClick={toggleMergeMode}
+                >
+                  Cancel Merge
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Help / Tips */}
+        <div className="clip-sidebar-section clip-help-box">
+          <h3 className="clip-sidebar-title">
+            <Info size={16} />
+            How to use
+          </h3>
+          <div className="clip-help-bordered">
+            <div className="clip-help-item">
+              <MousePointer2 size={14} />
+              <span>Click to select</span>
+            </div>
+            <div className="clip-help-item">
+              <Command size={14} />
+              <span><kbd>Ctrl</kbd> + Click to select</span>
+            </div>
+            <div className="clip-help-item">
+              <MousePointerClick size={14} />
+              <span><kbd>Ctrl</kbd> + <kbd>Shift</kbd> to range select</span>
+            </div>
+            <div className="clip-help-item">
+              <Focus size={14} />
+              <span>Double click to preview</span>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );

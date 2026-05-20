@@ -22,6 +22,7 @@ import type {
   StreamQuality,
 } from "../../types/download";
 import { EpisodeLabelModal, type EpisodeLabelResult } from "./EpisodeLabelModal";
+import { Dropdown } from "../../components/Dropdown";
 
 type PendingLabeledDownload = {
   target: StreamQuality;
@@ -755,10 +756,9 @@ export function AnikaiBrowser({
           <span />
           {status === "ready" ? "Live" : status === "loading" ? "Loading" : "Error"}
         </div>
-        <select
+        <Dropdown
           value={providerMode === "custom" ? "__custom__" : providerPresetId}
-          onChange={(e) => {
-            const next = e.target.value;
+          onChange={(next) => {
             if (next === "__custom__") {
               setProviderMode("custom");
               allowedHostsRef.current = [];
@@ -776,15 +776,16 @@ export function AnikaiBrowser({
             setLoadedUrl(preset.url);
             setReloadKey((k) => k + 1);
           }}
-          className="provider-select"
-        >
-          {PROVIDER_PRESETS.map((preset) => (
-            <option key={preset.id} value={preset.id}>
-              {preset.label}
-            </option>
-          ))}
-          <option value="__custom__">Custom URL</option>
-        </select>
+          className="provider-dropdown"
+          options={[
+            ...PROVIDER_PRESETS.map((preset) => ({
+              value: preset.id,
+              label: preset.label,
+              subtext: preset.url,
+            })),
+            { value: "__custom__", label: "Custom URL", subtext: "Specify any custom anime streaming site URL" }
+          ]}
+        />
         <input
           value={address}
           aria-label="Provider address"

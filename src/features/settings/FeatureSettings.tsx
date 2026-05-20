@@ -1,5 +1,6 @@
 import React from "react";
 import { Film } from "lucide-react";
+import { Dropdown } from "../../components/Dropdown";
 import type { AppConfig } from "../../types/app";
 
 interface FeatureSettingsProps {
@@ -126,17 +127,17 @@ export function FeatureSettings({
               Format used for the vocal and instrumental stems. WAV is lossless; MP3 is roughly 1/10th the size.
             </span>
           </div>
-          <select
-            className="settings-format-select"
+          <Dropdown
+            className="settings-format-dropdown"
             value={backendConfig?.audio_output_format ?? "wav"}
-            onChange={(event) => {
-              void persistConfigField("audio_output_format", event.currentTarget.value);
+            onChange={(val) => {
+              void persistConfigField("audio_output_format", val);
             }}
-            aria-label="Vocal extraction output format"
-          >
-            <option value="wav">WAV (lossless)</option>
-            <option value="mp3">MP3</option>
-          </select>
+            options={[
+              { value: "wav", label: "WAV", subtext: "Lossless, larger file size" },
+              { value: "mp3", label: "MP3", subtext: "Compressed, roughly 1/10th the size" },
+            ]}
+          />
         </div>
       </div>
     </div>

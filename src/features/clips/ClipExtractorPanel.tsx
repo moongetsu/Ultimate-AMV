@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ArrowRight, CheckCircle2, Clapperboard, Film, Info, Loader2, Scissors, Upload, X } from "lucide-react";
 import { Virtuoso } from "react-virtuoso";
+import { Dropdown } from "../../components/Dropdown";
 import {
   CLIP_AUDIO_SETTINGS_KEY,
   CLIP_COLUMN_OPTIONS,
@@ -1033,19 +1034,17 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
             <div className="clip-cols-label">
               <span>Export Format</span>
             </div>
-            <select
+            <Dropdown
               value={exportFormat}
-              onChange={(e) => setExportFormat(e.target.value as ClipExportFormat)}
-              className="clip-export-format-select"
-              title={selectedExportOption?.reason ?? selectedExportOption?.label}
-            >
-              {exportOptions.map((option) => (
-                <option key={option.value} value={option.value} disabled={option.disabled}>
-                  {option.label}{option.disabled ? " unavailable" : ""}
-                </option>
-              ))}
-            </select>
-            {selectedExportOption?.reason && <small className="stream-warning">{selectedExportOption.reason}</small>}
+              onChange={(val) => setExportFormat(val as ClipExportFormat)}
+              className="clip-export-format-dropdown"
+              options={exportOptions.map((option) => ({
+                value: option.value,
+                label: option.label,
+                disabled: option.disabled,
+                subtext: option.reason,
+              }))}
+            />
           </div>
 
           {!mergeMode && (

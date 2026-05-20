@@ -93,7 +93,7 @@ export function ClipPreviewTile({
   playable: boolean;
   activationEpoch: number;
   clipHoverPreview: boolean;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   onToggleSelect: () => void;
 }) {
   const [isHovered, setIsHovered] = React.useState(false);

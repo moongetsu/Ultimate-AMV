@@ -104,6 +104,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   const previewBatchInFlightRef = React.useRef(0);
   const previewTokenRef = React.useRef(0);
   const clipBatchProgressRef = React.useRef<ClipBatchProgressContext | null>(null);
+  const lastClickedIdRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     void refreshClipMode();
@@ -669,6 +670,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
       }
       return next;
     });
+    lastClickedIdRef.current = clipId;
   }
 
   function toggleAllClipSelection() {
@@ -681,13 +683,64 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     });
   }
 
-  function handleClipClick(clip: ClipPreviewItem) {
+  function handleShiftClick(clip: ClipPreviewItem, isCtrlPressed = false) {
+    const lastId = lastClickedIdRef.current;
+    if (!lastId) {
+      toggleClipSelection(clip.id);
+      lastClickedIdRef.current = clip.id;
+      return;
+    }
+
+    const lastIndex = clips.findIndex((item) => item.id === lastId);
+    const currentIndex = clips.findIndex((item) => item.id === clip.id);
+
+    if (lastIndex === -1 || currentIndex === -1) {
+      toggleClipSelection(clip.id);
+      lastClickedIdRef.current = clip.id;
+      return;
+    }
+
+    const start = Math.min(lastIndex, currentIndex);
+    const end = Math.max(lastIndex, currentIndex);
+
+    const sliceToSelect = clips.slice(start, end + 1).map((item) => item.id);
+    const shouldSelect = selectedClipIds.has(lastId);
+
+    setSelectedClipIds((current) => {
+      // If Ctrl is pressed, preserve the existing selection state and merge the range.
+      // If Ctrl is NOT pressed, reset the selection state to contain exactly this range.
+      const next = isCtrlPressed ? new Set(current) : new Set<string>();
+
+      for (const id of sliceToSelect) {
+        if (shouldSelect) {
+          next.add(id);
+        } else {
+          next.delete(id);
+        }
+      }
+      return next;
+    });
+
+    lastClickedIdRef.current = clip.id;
+  }
+
+  function handleClipClick(clip: ClipPreviewItem, e?: React.MouseEvent) {
     if (mergeMode) {
       toggleMergeOrder(clip.id);
+    } else if (e && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+      // Ctrl + Shift + Click: add/subtract range to/from existing selection
+      handleShiftClick(clip, true);
+    } else if (e && e.shiftKey) {
+      // Shift + Click: reset selection to strictly this range
+      handleShiftClick(clip, false);
+    } else if (e && (e.ctrlKey || e.metaKey)) {
+      // Ctrl + Click: toggle individual clip
+      toggleClipSelection(clip.id);
     } else {
       // Tile click opens the scene viewer with audio. Selection lives on the
       // corner button (clip-corner-select) so the two actions don't collide.
       setViewerClip(clip);
+      lastClickedIdRef.current = clip.id;
     }
   }
 
@@ -1073,7 +1126,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
                     selected={mergeMode ? mergePositions.has(clip.id) : selectedClipIds.has(clip.id)}
                     activationEpoch={activationEpoch}
                     clipHoverPreview={clipHoverPreview}
-                    onClick={() => handleClipClick(clip)}
+                    onClick={(e) => handleClipClick(clip, e)}
                     onToggleSelect={() =>
                       mergeMode ? toggleMergeOrder(clip.id) : toggleClipSelection(clip.id)
                     }

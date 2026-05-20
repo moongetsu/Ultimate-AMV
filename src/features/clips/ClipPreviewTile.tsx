@@ -95,10 +95,12 @@ export function ClipPreviewTile({
   playable: boolean;
   activationEpoch: number;
   clipHoverPreview: boolean;
-  onClick: () => void;
+  onClick: (modifiers: { ctrl: boolean; shift: boolean; doubleClick: boolean }) => void;
   onToggleSelect: () => void;
 }) {
   const [isHovered, setIsHovered] = React.useState(false);
+  const clickCountRef = React.useRef(0);
+  const clickTimerRef = React.useRef<number | null>(null);
 
   const previewRange = previewClipPlaybackRange(clip);
   const isPlayActive = !clipHoverPreview || isHovered;
@@ -114,6 +116,14 @@ export function ClipPreviewTile({
     setIsReady(false);
   }, [previewRange?.src, activationEpoch]);
 
+  React.useEffect(() => {
+    return () => {
+      if (clickTimerRef.current) {
+        window.clearTimeout(clickTimerRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div
       className={`clip-preview-tile-wrapper ${selected ? "is-selected" : ""}`}
@@ -123,7 +133,29 @@ export function ClipPreviewTile({
       <button
         type="button"
         className={`clip-preview-tile spring-motion ${selected ? "is-selected" : ""} ${mergeMode ? "is-selectable" : ""}`}
-        onClick={onClick}
+        onClick={(e) => {
+          const isCtrl = e.ctrlKey || e.metaKey;
+          const isShift = e.shiftKey;
+
+          clickCountRef.current += 1;
+
+          if (clickCountRef.current === 2) {
+            // Double click detected
+            if (clickTimerRef.current) {
+              window.clearTimeout(clickTimerRef.current);
+              clickTimerRef.current = null;
+            }
+            clickCountRef.current = 0;
+            onClick({ ctrl: isCtrl, shift: isShift, doubleClick: true });
+            return;
+          }
+
+          // Set timer for single click
+          clickTimerRef.current = window.setTimeout(() => {
+            clickCountRef.current = 0;
+            onClick({ ctrl: isCtrl, shift: isShift, doubleClick: false });
+          }, 250);
+        }}
       >
         {/* Base layer: the static thumbnail when we have one, placeholder otherwise. */}
         {/* Stays mounted while shouldPlay flips so the animated WebP fades in over */}

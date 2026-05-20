@@ -99,7 +99,7 @@ export function ClipPreviewTile({
   const [isHovered, setIsHovered] = React.useState(false);
   const previewRange = previewClipPlaybackRange(clip);
   const shouldPlay = Boolean(previewRange) && playable && !paused && (!clipHoverPreview || isHovered);
-  const thumbnail = useWebpThumbnail(previewRange?.src);
+  const thumbnail = useWebpThumbnail(previewRange?.src) || clip.previewState?.thumbnailSrc;
   const placeholderLoading = playable && clip.previewState?.status !== "error";
   const loopDuration = previewRange
     ? Math.max(0.45, previewRange.end - previewRange.start)

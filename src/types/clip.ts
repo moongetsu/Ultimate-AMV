@@ -4,6 +4,7 @@ export type ClipPreviewState = {
   src?: string;
   duration?: number;
   error?: string;
+  thumbnailSrc?: string;
 };
 
 export type ClipPreviewItem = {

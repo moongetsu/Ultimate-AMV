@@ -436,6 +436,56 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   }
 
   React.useEffect(() => {
+    if (!result || result.scenes.length === 0) return;
+
+    const renderable = result.scenes.map((scene, index) => {
+      const id = `${result.input}-${index}`;
+      return {
+        sceneId: id,
+        sourcePath: result.input,
+        start: scene.start,
+        end: scene.end,
+        fps: result.fps,
+      };
+    });
+
+    void invoke<string>("clip_thumbnail_generate_batch", { jobs: renderable })
+      .then((raw) => {
+        const payload = parseBridgePayload<{
+          type: "done";
+          items: Array<{
+            sceneId: string;
+            path?: string;
+            error?: string;
+          }>;
+        }>(raw);
+
+        setPreviewStates((current) => {
+          let next = current;
+          for (const item of payload.items) {
+            if (item.path) {
+              const existing = next[item.sceneId];
+              if (existing?.status !== "ready") {
+                next = {
+                  ...next,
+                  [item.sceneId]: {
+                    ...existing,
+                    status: existing?.status || "rendering",
+                    thumbnailSrc: convertFileSrc(item.path),
+                  },
+                };
+              }
+            }
+          }
+          return next;
+        });
+      })
+      .catch((err) => {
+        console.error("Could not generate static thumbnails:", err);
+      });
+  }, [result]);
+
+  React.useEffect(() => {
     if (!hasClips || !gridPreview) return;
 
     const token = previewTokenRef.current;

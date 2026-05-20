@@ -134,6 +134,21 @@ struct ClipPreviewBatchItem {
     error: Option<String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ClipThumbnailItem {
+    scene_id: String,
+    path: Option<String>,
+    error: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ClipThumbnailBatchDone {
+    r#type: String,
+    items: Vec<ClipThumbnailItem>,
+}
+
 #[derive(serde::Deserialize)]
 pub struct ExportClip {
     pub source: String,
@@ -3273,6 +3288,125 @@ async fn clip_preview_generate_batch(
     result
 }
 
+fn run_thumbnail_ffmpeg(
+    ffmpeg: &Path,
+    input: &Path,
+    output: &Path,
+    start: f64,
+) -> Result<(), String> {
+    let args = vec![
+        "-y".to_string(),
+        "-hide_banner".to_string(),
+        "-nostdin".to_string(),
+        "-loglevel".to_string(),
+        "error".to_string(),
+        "-ss".to_string(),
+        format!("{:.3}", start.max(0.0)),
+        "-i".to_string(),
+        input.to_string_lossy().to_string(),
+        "-vframes".to_string(),
+        "1".to_string(),
+        "-vf".to_string(),
+        "scale=426:240:force_original_aspect_ratio=increase,crop=426:240".to_string(),
+        "-q:v".to_string(),
+        "4".to_string(),
+        output.to_string_lossy().to_string(),
+    ];
+
+    let result = cmd(ffmpeg)
+        .args(args)
+        .output()
+        .map_err(|error| format!("Could not start ffmpeg thumbnail generator: {error}"))?;
+
+    if result.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&result.stderr).trim().to_string();
+    if stderr.is_empty() {
+        Err(format!(
+            "Thumbnail generator exited with code {}",
+            result.status.code().unwrap_or(-1)
+        ))
+    } else {
+        Err(stderr)
+    }
+}
+
+#[tauri::command]
+async fn clip_thumbnail_generate_batch(
+    window: tauri::Window,
+    jobs: Vec<ClipPreviewRequest>,
+) -> Result<String, String> {
+    log_info(
+        "clip.thumbnail.batch.start",
+        "Starting batched clip thumbnail extraction",
+        json!({ "count": jobs.len() }),
+    );
+    let app_data_dir = window
+        .app_handle()
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Could not get app data directory: {error}"))?;
+
+    let root = app_root()?;
+    let ffmpeg = find_tool(&root, "ffmpeg");
+    ensure_tool(&ffmpeg)?;
+
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let mut items = Vec::new();
+        for job_req in jobs {
+            let scene_id = job_req.scene_id.clone();
+            match resolve_clip_preview_job(&app_data_dir, job_req) {
+                Ok(resolved) => {
+                    let thumb_path = resolved.output.with_extension("jpg");
+                    if thumb_path.exists() && thumb_path.metadata().map(|m| m.len() > 128).unwrap_or(false) {
+                        items.push(ClipThumbnailItem {
+                            scene_id,
+                            path: Some(thumb_path.to_string_lossy().to_string()),
+                            error: None,
+                        });
+                    } else {
+                        match run_thumbnail_ffmpeg(&ffmpeg, &resolved.input, &thumb_path, resolved.start) {
+                            Ok(_) => {
+                                items.push(ClipThumbnailItem {
+                                    scene_id,
+                                    path: Some(thumb_path.to_string_lossy().to_string()),
+                                    error: None,
+                                });
+                            }
+                            Err(err) => {
+                                items.push(ClipThumbnailItem {
+                                    scene_id,
+                                    path: None,
+                                    error: Some(err),
+                                });
+                            }
+                        }
+                    }
+                }
+                Err(err) => {
+                    items.push(ClipThumbnailItem {
+                        scene_id,
+                        path: None,
+                        error: Some(err),
+                    });
+                }
+            }
+        }
+        Ok::<ClipThumbnailBatchDone, String>(ClipThumbnailBatchDone {
+            r#type: "done".to_string(),
+            items,
+        })
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+
+    serde_json::to_string(&result)
+        .map_err(|error| format!("Could not serialize thumbnail batch results: {error}"))
+}
+
+
 #[tauri::command]
 async fn scene_clip_render(
     window: tauri::Window,
@@ -5819,6 +5953,7 @@ pub fn run() {
             video_source_codec,
             clip_preview_generate,
             clip_preview_generate_batch,
+            clip_thumbnail_generate_batch,
             scene_clip_render,
             get_config,
             set_config,

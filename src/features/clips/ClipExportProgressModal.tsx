@@ -1,6 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, Check, Loader2, X } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Maximize2, Minimize2, X } from "lucide-react";
 
 export type ClipExportRowStatus = "pending" | "active" | "done" | "error" | "cancelled";
 
@@ -49,12 +49,18 @@ function statusIcon(status: ClipExportRowStatus) {
 
 export function ClipExportProgressModal({
   session,
+  minimized,
   onCancel,
   onClose,
+  onMinimize,
+  onRestore,
 }: {
   session: ClipExportSession | null;
+  minimized: boolean;
   onCancel: () => void;
   onClose: () => void;
+  onMinimize: () => void;
+  onRestore: () => void;
 }) {
   React.useEffect(() => {
     if (!session) return undefined;
@@ -95,6 +101,25 @@ export function ClipExportProgressModal({
       : `Exporting clip ${Math.min(session.activeIndex + 1, total)} of ${total}`;
   })();
 
+  if (minimized) {
+    return createPortal(
+      <ClipExportPill
+        session={session}
+        overall={overall}
+        doneCount={doneCount}
+        errorCount={errorCount}
+        total={total}
+        headerKicker={headerKicker}
+        headerTitle={headerTitle}
+        isRunning={isRunning}
+        onCancel={onCancel}
+        onClose={onClose}
+        onRestore={onRestore}
+      />,
+      document.body,
+    );
+  }
+
   return createPortal(
     <div
       className="episode-label-backdrop clip-export-backdrop"
@@ -111,16 +136,27 @@ export function ClipExportProgressModal({
             <h2>{headerTitle}</h2>
             <p>{session.outputDir}</p>
           </div>
-          {!isRunning && (
+          <div className="clip-export-header-actions">
             <button
               type="button"
               className="episode-label-close"
-              onClick={onClose}
-              aria-label="Close"
+              onClick={onMinimize}
+              aria-label="Minimize"
+              title="Minimize"
             >
-              <X size={16} />
+              <Minimize2 size={14} />
             </button>
-          )}
+            {!isRunning && (
+              <button
+                type="button"
+                className="episode-label-close"
+                onClick={onClose}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="clip-export-overall">
@@ -196,5 +232,100 @@ export function ClipExportProgressModal({
       </div>
     </div>,
     document.body,
+  );
+}
+
+function ClipExportPill({
+  session,
+  overall,
+  doneCount,
+  errorCount,
+  total,
+  headerKicker,
+  headerTitle,
+  isRunning,
+  onCancel,
+  onClose,
+  onRestore,
+}: {
+  session: ClipExportSession;
+  overall: number;
+  doneCount: number;
+  errorCount: number;
+  total: number;
+  headerKicker: string;
+  headerTitle: string;
+  isRunning: boolean;
+  onCancel: () => void;
+  onClose: () => void;
+  onRestore: () => void;
+}) {
+  // After the modal subtree unmounts on minimize, focus falls to document.body
+  // and Tab restarts from the top. Pull focus into the pill so keyboard users
+  // stay in context.
+  const bodyRef = React.useRef<HTMLButtonElement | null>(null);
+  React.useEffect(() => {
+    bodyRef.current?.focus();
+  }, []);
+  return (
+    <div
+      className={`clip-export-pill is-${session.phase}`}
+      role="status"
+      aria-label={`${headerKicker}: ${headerTitle}`}
+    >
+      <button
+        ref={bodyRef}
+        type="button"
+        className="clip-export-pill-body"
+        onClick={onRestore}
+        title="Expand"
+        aria-label="Expand export progress"
+      >
+        <div className="clip-export-pill-head">
+          <span className="clip-export-pill-kicker">{headerKicker}</span>
+          <span className="clip-export-pill-count">
+            {doneCount}/{total}
+            {errorCount > 0 ? ` · ${errorCount} failed` : ""}
+            {" · "}
+            {Math.round(overall)}%
+          </span>
+        </div>
+        <div className={`clip-progress-track ${isRunning && overall <= 0 ? "is-indeterminate" : ""}`}>
+          <span className="spring-motion" style={{ width: `${overall}%` }} />
+        </div>
+      </button>
+      <div className="clip-export-pill-actions">
+        <button
+          type="button"
+          className="clip-export-pill-btn"
+          onClick={onRestore}
+          aria-label="Expand"
+          title="Expand"
+        >
+          <Maximize2 size={13} strokeWidth={2.4} />
+        </button>
+        {isRunning ? (
+          <button
+            type="button"
+            className="clip-export-pill-btn is-cancel"
+            onClick={onCancel}
+            aria-label="Cancel export"
+            title="Cancel export"
+          >
+            <X size={14} strokeWidth={2.6} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="clip-export-pill-btn"
+            onClick={onClose}
+            aria-label="Dismiss"
+            title="Dismiss"
+          >
+            <X size={14} strokeWidth={2.6} />
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

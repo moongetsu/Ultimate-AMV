@@ -37,7 +37,7 @@ describe('ClipExportProgressModal — running phase', () => {
   it('renders dialog with aria-label when session is provided', () => {
     const session = makeSession()
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     expect(screen.getByRole('dialog', { name: /export progress/i })).toBeInTheDocument()
   })
@@ -45,7 +45,7 @@ describe('ClipExportProgressModal — running phase', () => {
   it('shows cancel button during running phase', () => {
     const session = makeSession({ phase: 'running' })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     expect(screen.getByRole('button', { name: /cancel export/i })).toBeInTheDocument()
   })
@@ -54,7 +54,7 @@ describe('ClipExportProgressModal — running phase', () => {
     const onCancel = vi.fn()
     const session = makeSession({ phase: 'running' })
     render(
-      <ClipExportProgressModal session={session} onCancel={onCancel} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={onCancel} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     await userEvent.click(screen.getByRole('button', { name: /cancel export/i }))
     expect(onCancel).toHaveBeenCalledTimes(1)
@@ -63,7 +63,7 @@ describe('ClipExportProgressModal — running phase', () => {
   it('does NOT show close button during running phase', () => {
     const session = makeSession({ phase: 'running' })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     expect(screen.queryByRole('button', { name: /close/i })).not.toBeInTheDocument()
   })
@@ -71,7 +71,7 @@ describe('ClipExportProgressModal — running phase', () => {
   it('shows active clip label inside the active-section during running phase', () => {
     const session = makeSession({ phase: 'running', activePercent: 45 })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     // Portal renders into document.body — query there
     const activeSection = document.body.querySelector('.clip-export-active') as HTMLElement
@@ -82,7 +82,7 @@ describe('ClipExportProgressModal — running phase', () => {
   it('shows fps and speed stats during running phase', () => {
     const session = makeSession({ phase: 'running', activeFps: '60', activeSpeed: '1.2x' })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     expect(screen.getByText(/60 fps/i)).toBeInTheDocument()
     expect(screen.getByText(/1\.2x/i)).toBeInTheDocument()
@@ -92,7 +92,7 @@ describe('ClipExportProgressModal — running phase', () => {
     const onClose = vi.fn()
     const session = makeSession({ phase: 'running' })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={onClose} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={onClose} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).not.toHaveBeenCalled()
@@ -111,7 +111,7 @@ describe('ClipExportProgressModal — complete phase', () => {
       ],
     })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     // Modal is rendered via createPortal into document.body — query there
     const closeButtons = screen.getAllByRole('button', { name: /close/i })
@@ -124,7 +124,7 @@ describe('ClipExportProgressModal — complete phase', () => {
   it('does NOT show cancel button when phase is complete', () => {
     const session = makeSession({ phase: 'complete' })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument()
   })
@@ -138,7 +138,7 @@ describe('ClipExportProgressModal — complete phase', () => {
       ],
     })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     // "Exported 2 of 2 clips"
     expect(screen.getByText(/exported.*clips/i)).toBeInTheDocument()
@@ -148,7 +148,7 @@ describe('ClipExportProgressModal — complete phase', () => {
     const onClose = vi.fn()
     const session = makeSession({ phase: 'complete' })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={onClose} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={onClose} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
@@ -158,7 +158,7 @@ describe('ClipExportProgressModal — complete phase', () => {
     const onClose = vi.fn()
     const session = makeSession({ phase: 'complete' })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={onClose} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={onClose} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     const backdrop = document.querySelector('.clip-export-backdrop') as HTMLElement
     // Click the backdrop element itself (not a child)
@@ -172,7 +172,7 @@ describe('ClipExportProgressModal — complete phase', () => {
     const onClose = vi.fn()
     const session = makeSession({ phase: 'complete' })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={onClose} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={onClose} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     // Portal renders into document.body — container.querySelector misses it
     const actionsClose = document.body.querySelector(
@@ -194,7 +194,7 @@ describe('ClipExportProgressModal — error phase', () => {
       ],
     })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     expect(screen.getByText(/export failed/i)).toBeInTheDocument()
   })
@@ -207,7 +207,7 @@ describe('ClipExportProgressModal — error phase', () => {
       ],
     })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     expect(screen.getByText('NVENC crashed')).toBeInTheDocument()
   })
@@ -215,7 +215,7 @@ describe('ClipExportProgressModal — error phase', () => {
   it('shows Close button in actions area when phase is error', () => {
     const session = makeSession({ phase: 'error' })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     const actionsClose = document.body.querySelector('.episode-label-actions .episode-label-confirm')
     expect(actionsClose).toBeInTheDocument()
@@ -228,7 +228,7 @@ describe('ClipExportProgressModal — cancelled phase', () => {
   it('shows cancelled header text', () => {
     const session = makeSession({ phase: 'cancelled' })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     expect(screen.getByText(/export cancelled/i)).toBeInTheDocument()
   })
@@ -236,7 +236,7 @@ describe('ClipExportProgressModal — cancelled phase', () => {
   it('shows Close button in actions area when phase is cancelled', () => {
     const session = makeSession({ phase: 'cancelled' })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     const actionsClose = document.body.querySelector('.episode-label-actions .episode-label-confirm')
     expect(actionsClose).toBeInTheDocument()
@@ -248,7 +248,7 @@ describe('ClipExportProgressModal — cancelled phase', () => {
 describe('ClipExportProgressModal — null session', () => {
   it('renders nothing when session is null', () => {
     const { container } = render(
-      <ClipExportProgressModal session={null} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={null} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     expect(container.firstChild).toBeNull()
   })
@@ -264,7 +264,7 @@ describe('ClipExportProgressModal — merge mode', () => {
       rows: [{ id: 'merge-1+2', label: '1+2.mov', range: '2 clips', status: 'done' }],
     })
     render(
-      <ClipExportProgressModal session={session} onCancel={vi.fn()} onClose={vi.fn()} />
+      <ClipExportProgressModal session={session} minimized={false} onCancel={vi.fn()} onClose={vi.fn()} onMinimize={vi.fn()} onRestore={vi.fn()} />
     )
     expect(screen.getByText(/merge complete/i)).toBeInTheDocument()
   })

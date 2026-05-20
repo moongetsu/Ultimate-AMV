@@ -105,9 +105,11 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   // very case the poster was meant to help with.
   const [viewerClipId, setViewerClipId] = React.useState<string | null>(null);
   const [exportSession, setExportSession] = React.useState<ClipExportSession | null>(null);
+  const [exportMinimized, setExportMinimized] = React.useState(false);
   const exportSessionRef = React.useRef<ClipExportSession | null>(null);
   React.useEffect(() => {
     exportSessionRef.current = exportSession;
+    if (!exportSession) setExportMinimized(false);
   }, [exportSession]);
 
   // Bump activationEpoch when the viewer closes so the grid's WebPs and CSS
@@ -855,6 +857,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
       range: `${mergeOrderedClips.length} clips`,
       status: "active",
     };
+    setExportMinimized(false);
     setExportSession({
       mode: "merge",
       rows: [mergeRow],
@@ -957,6 +960,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
 
     setError(null);
     setIsExtracting(true);
+    setExportMinimized(false);
     setExportSession({
       mode: "single",
       rows,
@@ -1393,11 +1397,14 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
 
         <ClipExportProgressModal
           session={exportSession}
+          minimized={exportMinimized}
           onCancel={() => {
             clipCancellingRef.current = true;
             void invoke("cancel_clip");
           }}
           onClose={() => setExportSession(null)}
+          onMinimize={() => setExportMinimized(true)}
+          onRestore={() => setExportMinimized(false)}
         />
 
         {mergeMode && (

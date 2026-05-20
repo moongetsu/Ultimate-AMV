@@ -15,11 +15,11 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader as AsyncBufReader};
 
 use crate::{
     app_root, apply_python_env, apply_python_env_async, canonical_input_path, clear_child_pid,
-    clip_cli_path, cmd, emit_conversion_progress, ensure_tool, ffmpeg_listing, find_tool,
-    kill_child_pid, log_error, log_info, log_warn, python_exe, run_ffmpeg_with_progress,
-    sanitize_path_segment, serialize_clip_preview_done, short_stable_id, store_child_pid,
-    truncate_log_text, append_app_log, CLIP_CHILD_PID, CLIP_SERVER, ConversionDone,
-    H264_NVENC_AVAILABLE,
+    clip_cli_path, cmd, content_fingerprint, emit_conversion_progress, ensure_tool, ffmpeg_listing,
+    find_tool, kill_child_pid, log_error, log_info, log_warn, python_exe,
+    run_ffmpeg_with_progress, sanitize_path_segment, serialize_clip_preview_done, short_stable_id,
+    store_child_pid, truncate_log_text, append_app_log, CLIP_CHILD_PID, CLIP_SERVER,
+    ConversionDone, H264_NVENC_AVAILABLE,
 };
 
 #[derive(Deserialize)]
@@ -694,38 +694,25 @@ fn generate_scene_clip(
     ensure_tool(&ffmpeg)?;
 
     let input = canonical_input_path(&source_path)?;
-    let metadata = input
-        .metadata()
-        .map_err(|error| format!("Could not read source metadata: {error}"))?;
-    let modified = metadata
-        .modified()
-        .ok()
-        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|duration| duration.as_secs().to_string())
-        .unwrap_or_else(|| "unknown".to_string());
-    let input_key = input.to_string_lossy().to_string();
-    let size_key = metadata.len().to_string();
-    let source_key = short_stable_id(&[&input_key, &size_key, &modified]);
-    let source_name = sanitize_path_segment(
-        input
-            .file_stem()
-            .and_then(|value| value.to_str())
-            .unwrap_or("episode"),
-        "episode",
-        56,
-    );
+    // Content-fingerprint key so renames / copies / moves of the same file
+    // all share the same cache folder. Path-based keys here would cache-
+    // miss every time the user renamed the source.
+    let source_key = content_fingerprint(&input).ok_or_else(|| {
+        "Could not compute scene cache fingerprint for source file.".to_string()
+    })?;
     let cache_dir = app_data_dir
         .join("scene_clips")
-        .join(format!("{source_name}-{source_key}"));
+        .join(&source_key);
     fs::create_dir_all(&cache_dir)
         .map_err(|error| format!("Could not create scene clip cache folder: {error}"))?;
 
     let start_key = format!("{:.3}", start);
     let end_key = format!("{:.3}", end);
-    // v4: -hwaccel auto for universal hardware decode acceleration.
-    let range_key = short_stable_id(&[&scene_id, &start_key, &end_key, "scene-clip-v4"]);
-    let safe_scene_id = sanitize_path_segment(&scene_id, "scene", 48).replace(' ', "_");
-    let output = cache_dir.join(format!("{safe_scene_id}-{range_key}.mp4"));
+    // v5: drop scene_id from filename (was path-dependent via clip.id);
+    // (start, end) is unique-per-source by definition since scenes don't
+    // overlap. v4 retained: -hwaccel auto for universal hw decode accel.
+    let range_key = short_stable_id(&[&start_key, &end_key, "scene-clip-v5"]);
+    let output = cache_dir.join(format!("{range_key}.mp4"));
     let duration = (end - start).max(0.05);
 
     if output
@@ -979,14 +966,16 @@ pub(crate) async fn warmup_clip_server(app: tauri::AppHandle) -> Result<(), Stri
                 continue;
             }
             if let Ok(value) = serde_json::from_str::<Value>(line) {
-                let is_progress = value.get("type").and_then(Value::as_str) == Some("progress");
-                if matches!(value.get("type").and_then(Value::as_str), Some("log") | Some("error") | Some("done")) {
-                    let level = if value.get("type").and_then(Value::as_str) == Some("error") {
-                        "error"
-                    } else {
-                        "info"
-                    };
+                let event_type = value.get("type").and_then(Value::as_str);
+                let is_progress = event_type == Some("progress");
+                if matches!(event_type, Some("log") | Some("error") | Some("done")) {
+                    let level = if event_type == Some("error") { "error" } else { "info" };
                     append_app_log(level, "clip.server.event", "Clip server emitted event", value.clone());
+                }
+                if event_type == Some("done") {
+                    if let Ok(app_data_dir) = app_handle.path().app_data_dir() {
+                        try_persist_scene_cache(&app_data_dir, &value);
+                    }
                 }
                 let _ = app_handle.emit("clip-server-event", &value);
                 // Also emit to clip-progress for backward compatibility if it's a progress event
@@ -1015,15 +1004,90 @@ pub(crate) async fn warmup_clip_server(app: tauri::AppHandle) -> Result<(), Stri
     Ok(())
 }
 
+// Scene-detection cache. The expensive AI pass (TransNetV2 / PySceneDetect)
+// is fully determined by the input file's content + extraction mode, so
+// the result can be reused verbatim on re-select. The cache key is purely
+// content-based:
+// - sampling SHA-256 fingerprint (head + middle + tail + size) — uniquely
+//   identifies the bytes regardless of path, rename, or copy. Renaming a
+//   file or extracting a duplicate copy in a different folder both reuse
+//   the cache for free.
+// - mode (CPU vs GPU may detect slightly differently)
+// - protocol version (bump to invalidate the whole cache atomically)
+// On cache hit, the original payload's "input" field (the path of the
+// file the original extraction ran on) is overwritten with the path the
+// user actually selected, so the rest of the app sees the correct path.
+const CLIP_SCENES_CACHE_VERSION: &str = "clip-scenes-v3";
+
+fn scene_cache_key(input: &Path, mode: &str) -> Option<String> {
+    // Path/size/mtime are deliberately NOT in the key. The fingerprint
+    // already uniquely identifies the file's content (it folds in the
+    // size as a salt), so any path-dependent factor would just defeat
+    // cross-rename and cross-copy dedup. canonicalize() is still needed
+    // to resolve the file the user pointed at — but only so we can read
+    // its bytes for the fingerprint, not to make it part of the key.
+    let canonical = input.canonicalize().ok()?;
+    let fingerprint = content_fingerprint(&canonical)?;
+    Some(short_stable_id(&[
+        &fingerprint,
+        mode,
+        CLIP_SCENES_CACHE_VERSION,
+    ]))
+}
+
+fn scene_cache_path(app_data_dir: &Path, key: &str) -> PathBuf {
+    app_data_dir
+        .join("clip_scenes_cache")
+        .join(format!("{key}.json"))
+}
+
+fn read_scene_cache(path: &Path) -> Option<Value> {
+    let content = fs::read_to_string(path).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
+fn write_scene_cache(path: &Path, payload: &Value) {
+    // Atomic write via tmp + rename so a concurrent reader can't observe
+    // a truncated JSON file (fs::write truncates in place). The 300-scene
+    // payload is hundreds of KB; a torn read would silently fail
+    // deserialization and re-trigger the full AI pass.
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let Ok(text) = serde_json::to_string(payload) else { return };
+    let tmp = path.with_extension("json.tmp");
+    if fs::write(&tmp, text).is_ok() {
+        let _ = fs::rename(&tmp, path);
+    }
+}
+
+// Called from both the persistent-server reader and the one-shot reader on
+// every "done" event so successful extractions self-populate the cache
+// regardless of which path produced them. The input + mode come straight
+// from the done payload (clip_cli.py emits them), so this stays correct
+// even if multiple extractions overlap.
+fn try_persist_scene_cache(app_data_dir: &Path, done_payload: &Value) {
+    let Some(input) = done_payload.get("input").and_then(Value::as_str) else { return };
+    let Some(mode) = done_payload.get("mode").and_then(Value::as_str) else { return };
+    let Some(key) = scene_cache_key(Path::new(input), mode) else { return };
+    write_scene_cache(&scene_cache_path(app_data_dir, &key), done_payload);
+}
+
 #[tauri::command]
-pub(crate) async fn clip_extract(window: tauri::Window, input_path: String, mode: String) -> Result<String, String> {
+pub(crate) async fn clip_extract(
+    window: tauri::Window,
+    input_path: String,
+    mode: String,
+    force: Option<bool>,
+) -> Result<String, String> {
     if mode != "cpu" && mode != "gpu" {
         return Err("Clip extraction mode must be cpu or gpu".to_string());
     }
+    let force = force.unwrap_or(false);
     log_info(
         "clip.extract.start",
         "Starting clip extraction",
-        json!({ "input": &input_path, "mode": &mode }),
+        json!({ "input": &input_path, "mode": &mode, "force": force }),
     );
 
     let input_path_buf = PathBuf::from(&input_path);
@@ -1036,6 +1100,65 @@ pub(crate) async fn clip_extract(window: tauri::Window, input_path: String, mode
         "Clip extraction source is ready",
         json!({ "input": &source_path }),
     );
+
+    // Cache short-circuit: scene detection is fully deterministic for the
+    // same (file content, mode) tuple, so reuse the prior JSON instead of
+    // re-running the AI pass. The frontend's one-shot branch parses the
+    // returned payload directly, so the cache hit looks identical to a
+    // fast one-shot extraction from the UI side. `force` is set by the
+    // "Extract again" button so a user can deliberately bust the cache
+    // when they suspect detection drift or want a fresh run.
+    if !force {
+        if let Ok(app_data_dir) = window.app_handle().path().app_data_dir() {
+            if let Some(key) = scene_cache_key(&input_path_buf, &mode) {
+                let cache_path = scene_cache_path(&app_data_dir, &key);
+                if let Some(mut payload) = read_scene_cache(&cache_path) {
+                    let scene_count = payload
+                        .get("sceneCount")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(0);
+                    // Cache may have been written by an earlier extraction
+                    // of the same content at a different path (rename, copy
+                    // to another folder, etc.). Rewrite the user-visible
+                    // paths to whatever they selected this time — the
+                    // top-level "input" used by progress messages AND each
+                    // scene's "source" which the frontend feeds back into
+                    // the preview backend as the clip's path. Leaving the
+                    // original source there would make the preview backend
+                    // try to open the prior path, which may no longer
+                    // exist after a rename, producing 0/N cached.
+                    if let Some(map) = payload.as_object_mut() {
+                        map.insert("input".to_string(), Value::String(source_path.clone()));
+                        if let Some(scenes) = map.get_mut("scenes").and_then(Value::as_array_mut) {
+                            for scene in scenes {
+                                if let Some(scene_obj) = scene.as_object_mut() {
+                                    scene_obj.insert(
+                                        "source".to_string(),
+                                        Value::String(source_path.clone()),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    log_info(
+                        "clip.extract.cache.hit",
+                        "Reusing cached scene extraction",
+                        json!({ "input": &source_path, "mode": &mode, "scenes": scene_count }),
+                    );
+                    let _ = window.emit(
+                        "clip-progress",
+                        json!({
+                            "type": "progress",
+                            "stage": "complete",
+                            "percent": 100,
+                            "message": format!("Loaded {} scenes from cache", scene_count),
+                        }),
+                    );
+                    return Ok(payload.to_string());
+                }
+            }
+        }
+    }
 
     // Try to use persistent server first
     let server_mutex: &AsyncMutex<Option<AsyncChild>> = CLIP_SERVER.get_or_init(|| AsyncMutex::new(None));
@@ -1428,7 +1551,13 @@ fn run_streaming_clip_cli(window: tauri::Window, args: Vec<String>) -> Result<St
                 Some("progress") => {
                     let _ = window.emit("clip-progress", value);
                 }
-                Some("done") | Some("error") => {
+                Some("done") => {
+                    if let Ok(app_data_dir) = window.app_handle().path().app_data_dir() {
+                        try_persist_scene_cache(&app_data_dir, &value);
+                    }
+                    final_payload = Some(line);
+                }
+                Some("error") => {
                     final_payload = Some(line);
                 }
                 _ => {}

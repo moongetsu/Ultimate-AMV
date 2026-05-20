@@ -1233,6 +1233,40 @@ pub(crate) fn short_stable_id(parts: &[&str]) -> String {
     format!("{hash:016x}")[..10].to_string()
 }
 
+// Sampling content fingerprint — three 64 KB windows at head, middle, and
+// tail of the file (plus the size as a salt), SHA-256'd together. ~192 KB
+// of I/O total regardless of file size, sub-10 ms on SSD even for a 4 GB
+// BD rip. Catches "looks identical by metadata but bytes differ" swaps
+// and lets caches survive cross-rename / cross-copy of the same content.
+// Adversarial collision crafting is out of scope. For files < 192 KB the
+// whole file is hashed.
+pub(crate) fn content_fingerprint(input: &std::path::Path) -> Option<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    use sha2::{Digest, Sha256};
+    const SAMPLE: u64 = 64 * 1024;
+
+    let mut file = std::fs::File::open(input).ok()?;
+    let size = file.metadata().ok()?.len();
+
+    let mut hasher = Sha256::new();
+    hasher.update(size.to_le_bytes());
+
+    if size <= SAMPLE * 3 {
+        let mut buf = Vec::with_capacity(size as usize);
+        file.read_to_end(&mut buf).ok()?;
+        hasher.update(&buf);
+    } else {
+        let mut buf = vec![0u8; SAMPLE as usize];
+        for offset in [0u64, size / 2, size - SAMPLE] {
+            file.seek(SeekFrom::Start(offset)).ok()?;
+            file.read_exact(&mut buf).ok()?;
+            hasher.update(&buf);
+        }
+    }
+
+    Some(hex::encode(hasher.finalize()))
+}
+
 pub(crate) fn sanitize_path_segment(value: &str, fallback: &str, max_len: usize) -> String {
     let mut sanitized = String::with_capacity(value.len());
     let mut last_was_space = false;

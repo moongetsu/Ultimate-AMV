@@ -9,8 +9,8 @@ use serde_json::json;
 use tauri::Manager;
 
 use crate::{
-    app_root, canonical_input_path, cmd, ensure_tool, find_tool, log_error,
-    log_info, sanitize_path_segment, short_stable_id,
+    app_root, canonical_input_path, cmd, content_fingerprint, ensure_tool, find_tool, log_error,
+    log_info, short_stable_id,
 };
 
 #[derive(Serialize)]
@@ -185,44 +185,30 @@ fn resolve_clip_preview_job(
     }
 
     let input = canonical_input_path(&request.source_path)?;
-    let metadata = input
-        .metadata()
-        .map_err(|error| format!("Could not read source metadata: {error}"))?;
-    let modified = metadata
-        .modified()
-        .ok()
-        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|duration| duration.as_secs().to_string())
-        .unwrap_or_else(|| "unknown".to_string());
-    let input_key = input.to_string_lossy().to_string();
-    let size_key = metadata.len().to_string();
-    let source_key = short_stable_id(&[&input_key, &size_key, &modified]);
-    let source_name = sanitize_path_segment(
-        input
-            .file_stem()
-            .and_then(|value| value.to_str())
-            .unwrap_or("episode"),
-        "episode",
-        56,
-    );
+    // Content-fingerprint key so the preview cache stays valid across
+    // rename / move / copy of the same file. Previously this was hashed
+    // from (path + size + mtime), which silently invalidated every
+    // preview the moment the user renamed the source — even though the
+    // scene cache (which got the same fix earlier) would still hit and
+    // the user would see "21 scenes ready - 0/21 previews cached" with
+    // the WebPs slowly regenerating from scratch.
+    let source_key = content_fingerprint(&input)
+        .ok_or_else(|| "Could not compute preview cache fingerprint for source file.".to_string())?;
     let cache_dir = app_data_dir
         .join("clip_previews")
-        .join(format!("{source_name}-{source_key}"));
+        .join(&source_key);
     fs::create_dir_all(&cache_dir)
         .map_err(|error| format!("Could not create preview cache folder: {error}"))?;
 
     let start_key = format!("{:.3}", request.start);
     let end_key = format!("{:.3}", request.end);
     let fps_key = format!("{:.3}", request.fps);
-    let range_key = short_stable_id(&[
-        &request.scene_id,
-        &start_key,
-        &end_key,
-        &fps_key,
-        "preview-webp-v1",
-    ]);
-    let safe_scene_id = sanitize_path_segment(&request.scene_id, "scene", 48).replace(' ', "_");
-    let output = cache_dir.join(format!("{safe_scene_id}-{range_key}.webp"));
+    // Filename is purely (start, end, fps) — no scene_id, because the
+    // frontend builds clip.id from the source filename and we want the
+    // cache to survive renames. Two distinct scenes can't share the same
+    // (start, end) within the same source, so this stays unique.
+    let range_key = short_stable_id(&[&start_key, &end_key, &fps_key, "preview-webp-v2"]);
+    let output = cache_dir.join(format!("{range_key}.webp"));
     let temp_output = output.with_extension("tmp.webp");
     let duration = preview_proxy_duration(request.start, request.end, request.fps);
 
@@ -280,7 +266,11 @@ fn generate_clip_preview_batch(
         }
     }
 
-    const PARALLELISM: usize = 4;
+    // Capped at 2 (down from 4) so preview rendering never floods the CPU
+    // while the user is interacting. Combined with the libwebp -threads cap
+    // in run_preview_ffmpeg, this leaves ~4 cores reserved for the encoder
+    // and the rest permanently free for the UI / scrolling / playback.
+    const PARALLELISM: usize = 2;
     let ffmpeg_path = ffmpeg.as_path();
     for chunk in pending.chunks(PARALLELISM) {
         let rendered: Vec<ClipPreviewBatchItem> = thread::scope(|scope| {
@@ -483,6 +473,10 @@ fn run_preview_ffmpeg(
     args.extend([
         "-vcodec".to_string(),
         "libwebp".to_string(),
+        // Cap encoder to 2 threads so the cache fill can't soak every core
+        // even when several preview jobs run in parallel.
+        "-threads".to_string(),
+        "2".to_string(),
         "-lossless".to_string(),
         "0".to_string(),
         "-q:v".to_string(),

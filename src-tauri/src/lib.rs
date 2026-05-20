@@ -22,7 +22,7 @@ mod wallpaper;
 // Re-export internal helpers so sibling modules and discord.rs/tools.rs can
 // keep using `crate::xxx` paths.
 pub(crate) use clips::stop_clip_processes_for_dependency_setup;
-pub(crate) use downloads::{sanitize_path_segment, short_stable_id};
+pub(crate) use downloads::{content_fingerprint, sanitize_path_segment, short_stable_id};
 pub(crate) use logging::{append_app_log, app_state_dir, log_error, log_info, log_warn, reset_app_logs, truncate_log_text};
 pub(crate) use preview::serialize_clip_preview_done;
 pub(crate) use python_env::{

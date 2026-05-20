@@ -644,6 +644,51 @@
   color: var(--rose);
 }
 
+/* ── Settings action pill — Discord brand variant ── */
+.settings-action-pill.is-discord {
+  background: linear-gradient(135deg, #5865f2 0%, #4752c4 100%);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  box-shadow:
+    0 4px 14px rgba(88, 101, 242, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  padding-right: 16px;
+}
+
+.settings-action-pill.is-discord:hover:not(:disabled) {
+  background: linear-gradient(135deg, #6671ff 0%, #525fdc 100%);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow:
+    0 8px 22px rgba(88, 101, 242, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.settings-action-pill.is-discord:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow:
+    0 3px 10px rgba(88, 101, 242, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.settings-action-pill.is-discord .settings-action-pill-icon {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.settings-action-pill.is-discord:hover:not(:disabled) .settings-action-pill-icon {
+  background: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+
+.settings-action-pill.is-discord .settings-action-pill-label {
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  font-size: 12.5px;
+}
+
 /* ── Settings toggle switch (Discord Rich Presence) ── */
 .settings-toggle-wrap {
   flex-shrink: 0;

@@ -1,3 +1,53 @@
+/* ============================================================
+   TABLE OF CONTENTS
+   ============================================================
+    1. VARIABLES, THEME TOKENS & UTILITIES
+    2. RESET & GLOBAL
+    3. APP BACKGROUND (image layer + has-app-bg chain)
+    4. BACKGROUND CUSTOMIZER MODAL
+    5. WINDOW CHROME
+    6. UPDATE TOAST
+    7. APP SHELL LAYOUT
+    8. SIDEBAR & NAVIGATION
+    9. WORKSPACE, CANVAS & FOCUS PANEL
+   10. EMPTY SURFACE
+   11. ANIKAI BROWSER LAYOUT
+   12. DOWNLOADER WORKSPACE & QUEUE
+   13. YOUTUBE DOWNLOADER
+   14. PROVIDER TOOLBAR & WEBVIEW
+   15. STREAM CAPTURE BAR
+   16. QUALITY PICKER
+   17. CLIP EXTRACTOR PANEL
+   18. CLIP PREVIEW GRID & MERGE STRIP
+   19. SPINNER
+   20. ANIME BROWSER & PLAYER
+   21. AUDIO EXTRACTION
+   22. STEM MIXER
+   23. AUDIO MESSAGES & BATCH STATUS
+   24. VIDEO / AUDIO CONVERSION
+   25. AUDIO HISTORY
+   26. LOGS PANEL
+   27. HISTORY ROW
+   28. COMPACT SIDEBAR OVERRIDES
+   29. RESPONSIVE: max-width 860px
+   30. SETTINGS PANEL
+   31. SETUP WIZARD
+   32. CLIP SERVER BADGE
+   33. STARTUP GATE
+   34. TOOLS GATE
+   35. YOUTUBE TRIM EDITOR
+   36. EPISODE LABEL MODAL
+   37. CLIP COMPAT CONVERT MODAL
+   38. DRAG & DROP ZONES
+   39. CROPPER EMPTY STATE OVERRIDES
+   40. CLIP EXPORT PROGRESS MODAL
+   41. SCENE VIEWER MODAL
+   ============================================================ */
+
+/* ============================================================
+   1. VARIABLES, THEME TOKENS & UTILITIES
+   ============================================================ */
+
 @property --sidebar-width {
   syntax: "<length>";
   inherits: true;
@@ -101,6 +151,10 @@
   box-shadow: var(--accent-glow);
 }
 
+/* ============================================================
+   2. RESET & GLOBAL
+   ============================================================ */
+
 * {
   box-sizing: border-box;
 }
@@ -126,6 +180,10 @@ button {
   overflow: hidden;
   background: #020203;
 }
+
+/* ============================================================
+   3. APP BACKGROUND (image layer + has-app-bg chain)
+   ============================================================ */
 
 :root.has-app-bg,
 :root.has-app-bg body,
@@ -194,6 +252,10 @@ button {
   z-index: 1;
 }
 
+
+/* ============================================================
+   4. BACKGROUND CUSTOMIZER MODAL
+   ============================================================ */
 
 .bg-customizer-backdrop {
   position: fixed;
@@ -328,6 +390,10 @@ button {
   gap: 8px;
 }
 
+/* ============================================================
+   5. WINDOW CHROME
+   ============================================================ */
+
 .window-chrome {
   position: fixed;
   z-index: 20;
@@ -368,6 +434,10 @@ button {
 .window-controls .close-window:hover {
   background: #d63f4d;
 }
+
+/* ============================================================
+   6. UPDATE TOAST
+   ============================================================ */
 
 .update-toast {
   position: fixed;
@@ -470,6 +540,10 @@ button {
   white-space: nowrap;
 }
 
+/* ============================================================
+   7. APP SHELL LAYOUT
+   ============================================================ */
+
 .app-shell {
   width: 100vw;
   height: 100vh;
@@ -492,6 +566,10 @@ button {
   --sidebar-label-width: 0px;
   --sidebar-gap: 0px;
 }
+
+/* ============================================================
+   8. SIDEBAR & NAVIGATION
+   ============================================================ */
 
 .sidebar {
   position: relative;
@@ -744,6 +822,10 @@ button {
   background: rgba(255, 255, 255, 0.045);
 }
 
+/* ============================================================
+   9. WORKSPACE, CANVAS & FOCUS PANEL
+   ============================================================ */
+
 .workspace {
   min-width: 0;
   min-height: 0;
@@ -845,6 +927,10 @@ button {
   display: none;
 }
 
+/* ============================================================
+   10. EMPTY SURFACE
+   ============================================================ */
+
 .empty-surface {
   display: grid;
   place-items: center;
@@ -870,6 +956,10 @@ button {
   letter-spacing: 0;
 }
 
+/* ============================================================
+   11. ANIKAI BROWSER LAYOUT
+   ============================================================ */
+
 .anikai-browser {
   min-width: 0;
   min-height: 0;
@@ -893,6 +983,10 @@ button {
 .anikai-browser > .stream-capture-bar {
   flex: 0 0 auto;
 }
+
+/* ============================================================
+   12. DOWNLOADER WORKSPACE & QUEUE
+   ============================================================ */
 
 .downloader-workspace {
   min-width: 0;
@@ -1013,6 +1107,10 @@ button {
   color: var(--rose);
   background: rgba(255, 109, 145, 0.08);
 }
+
+/* ============================================================
+   13. YOUTUBE DOWNLOADER
+   ============================================================ */
 
 .youtube-downloader {
   min-width: 0;
@@ -1250,6 +1348,10 @@ button {
   font-size: 10.5px;
 }
 
+/* ============================================================
+   14. PROVIDER TOOLBAR & WEBVIEW
+   ============================================================ */
+
 .provider-toolbar {
   min-width: 0;
   display: flex;
@@ -1383,6 +1485,10 @@ button {
   color: var(--muted);
   font-size: 13px;
 }
+
+/* ============================================================
+   15. STREAM CAPTURE BAR
+   ============================================================ */
 
 .stream-capture-bar {
   position: relative;
@@ -1573,6 +1679,10 @@ button {
   background: var(--rose);
 }
 
+/* ============================================================
+   16. QUALITY PICKER
+   ============================================================ */
+
 .quality-picker {
   position: relative;
   min-width: 0;
@@ -1650,6 +1760,10 @@ button {
   font-size: 10.5px;
   font-family: "JetBrains Mono", "Cascadia Mono", ui-monospace, monospace;
 }
+
+/* ============================================================
+   17. CLIP EXTRACTOR PANEL
+   ============================================================ */
 
 .clip-extractor {
   min-width: 0;
@@ -2062,6 +2176,10 @@ button {
   color: rgb(var(--theme-accent-rgb));
   text-decoration-color: rgb(var(--theme-accent-rgb) / 0.6);
 }
+
+/* ============================================================
+   18. CLIP PREVIEW GRID & MERGE STRIP
+   ============================================================ */
 
 .clip-extractor-stage {
   position: relative;
@@ -2660,6 +2778,10 @@ button {
   font-weight: 680;
 }
 
+/* ============================================================
+   19. SPINNER
+   ============================================================ */
+
 .is-spinning {
   animation: spin 1s linear infinite;
 }
@@ -2669,6 +2791,10 @@ button {
     transform: rotate(360deg);
   }
 }
+
+/* ============================================================
+   20. ANIME BROWSER & PLAYER
+   ============================================================ */
 
 .anime-browser {
   min-height: 0;
@@ -3102,6 +3228,10 @@ button {
   font-size: 12px;
   text-decoration: none;
 }
+
+/* ============================================================
+   21. AUDIO EXTRACTION
+   ============================================================ */
 
 .audio-extract {
   position: relative;
@@ -3585,7 +3715,10 @@ button {
   border: 0;
 }
 
-/* ── Stem mixer (post-extraction preview) ── */
+/* ============================================================
+   22. STEM MIXER (post-extraction preview)
+   ============================================================ */
+
 .stem-mixer {
   width: min(880px, 94%);
   display: grid;
@@ -3828,6 +3961,10 @@ button {
   }
 }
 
+/* ============================================================
+   23. AUDIO MESSAGES & BATCH STATUS
+   ============================================================ */
+
 .audio-message {
   grid-row: 3;
   display: inline-flex;
@@ -3883,6 +4020,10 @@ button {
 .audio-message.is-error {
   color: var(--rose);
 }
+
+/* ============================================================
+   24. VIDEO / AUDIO CONVERSION
+   ============================================================ */
 
 .conversion-panel {
   min-height: 0;
@@ -4306,11 +4447,19 @@ button {
   color: var(--muted);
 }
 
+/* ============================================================
+   25. AUDIO HISTORY
+   ============================================================ */
+
 .audio-history {
   min-height: 0;
   overflow: auto;
   padding: 22px;
 }
+
+/* ============================================================
+   26. LOGS PANEL
+   ============================================================ */
 
 .logs-panel {
   min-height: 0;
@@ -4400,6 +4549,10 @@ button {
   white-space: pre-wrap;
 }
 
+/* ============================================================
+   27. HISTORY ROW
+   ============================================================ */
+
 .history-row {
   display: grid;
   gap: 6px;
@@ -4424,6 +4577,10 @@ button {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* ============================================================
+   28. COMPACT SIDEBAR OVERRIDES
+   ============================================================ */
 
 .is-compact .brand-strip {
   grid-template-columns: 40px minmax(0, 0px);
@@ -4495,6 +4652,10 @@ button {
 .is-expanded .settings-button span {
   opacity: 1;
 }
+
+/* ============================================================
+   29. RESPONSIVE: max-width 860px
+   ============================================================ */
 
 @media (max-width: 860px) {
   .app-shell,
@@ -4676,6 +4837,10 @@ button {
     width: 100%;
   }
 }
+
+/* ============================================================
+   30. SETTINGS PANEL
+   ============================================================ */
 
 .settings-panel {
   min-height: 0;
@@ -5502,7 +5667,10 @@ button {
   }
 }
 
-/* ── Setup Wizard ── */
+/* ============================================================
+   31. SETUP WIZARD
+   ============================================================ */
+
 .setup-wizard {
   position: fixed;
   inset: 0;
@@ -5874,6 +6042,10 @@ button {
   margin-top: 1px;
 }
 
+/* ============================================================
+   32. CLIP SERVER BADGE
+   ============================================================ */
+
 .clip-server-badge {
   display: inline-flex;
   align-items: center;
@@ -5934,6 +6106,10 @@ button {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(0.85); }
 }
+
+/* ============================================================
+   33. STARTUP GATE
+   ============================================================ */
 
 .startup-gate {
   position: fixed;
@@ -6115,6 +6291,10 @@ button {
   }
 }
 
+/* ============================================================
+   34. TOOLS GATE
+   ============================================================ */
+
 .tools-gate-list {
   display: grid;
   gap: 10px;
@@ -6199,6 +6379,10 @@ button {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+
+/* ============================================================
+   35. YOUTUBE TRIM EDITOR
+   ============================================================ */
 
 .youtube-trim {
   display: grid;
@@ -6534,6 +6718,10 @@ button {
   }
 }
 
+/* ============================================================
+   36. EPISODE LABEL MODAL
+   ============================================================ */
+
 /* Episode label modal : surfaces when the network sniffer downloads a
    stream we couldn't auto-identify, so the user can pick an existing
    anime folder (autocomplete) or save anywhere on disk. */
@@ -6808,6 +6996,10 @@ button {
   box-shadow: none;
 }
 
+/* ============================================================
+   37. CLIP COMPAT CONVERT MODAL
+   ============================================================ */
+
 /* Clip extractor compatibility-convert modal : reuses .episode-label-* shell. */
 .clip-compat-status {
   display: flex;
@@ -6853,6 +7045,10 @@ button {
   background: rgb(var(--theme-accent-rgb) / 0.12);
   border: 1px solid rgb(var(--theme-accent-rgb) / 0.28);
 }
+
+/* ============================================================
+   38. DRAG & DROP ZONES
+   ============================================================ */
 
 /* Drag-and-drop zones : hover indicator while the OS is holding files
    over a region wired up via useFileDrop. The overlay is pointer-events:
@@ -6905,6 +7101,10 @@ button {
   color: #aeb8c1;
 }
 
+/* ============================================================
+   39. CROPPER EMPTY STATE OVERRIDES
+   ============================================================ */
+
 /* Cropper frame becomes interactive when empty so clicking it opens the
    picker; the cursor hint mirrors the new affordance. */
 .bg-cropper-frame.is-empty {
@@ -6916,6 +7116,10 @@ button {
 .bg-cropper-empty {
   transition: color 140ms ease;
 }
+
+/* ============================================================
+   40. CLIP EXPORT PROGRESS MODAL
+   ============================================================ */
 
 /* Clip export progress modal : pops up during clip export / merge so the
    user sees real per-clip ffmpeg progress + aggregate overall, with the
@@ -7081,6 +7285,10 @@ button {
   background: rgba(255, 109, 145, 0.12);
   border-color: rgba(255, 109, 145, 0.55);
 }
+
+/* ============================================================
+   41. SCENE VIEWER MODAL
+   ============================================================ */
 
 /* Scene viewer modal : reuses .episode-label-* shell, widens it for video,
    and gives the <video> a black letterboxing stage. No autoplay loop -

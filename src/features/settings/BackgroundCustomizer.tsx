@@ -322,8 +322,13 @@ export function BackgroundCustomizer({
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
     const scale = draftRef.current.scale;
-    const nextX = clampNumber(drag.offsetX - (dx / rect.width) * 100 / scale, 0, 100);
-    const nextY = clampNumber(drag.offsetY - (dy / rect.height) * 100 / scale, 0, 100);
+    // At scale=1 the image covers the frame exactly; the translate-based
+    // pan has zero overhang to sweep, so dragging is a no-op. The cropper
+    // only has something to pan once the user zooms in.
+    if (scale <= 1) return;
+    const step = (scale - 1);
+    const nextX = clampNumber(drag.offsetX - (dx / rect.width) * 100 / step, 0, 100);
+    const nextY = clampNumber(drag.offsetY - (dy / rect.height) * 100 / step, 0, 100);
     update({ offsetX: nextX, offsetY: nextY });
   }
   function handlePointerUp(event: React.PointerEvent<HTMLDivElement>) {
@@ -522,8 +527,8 @@ export function BackgroundCustomizer({
                 className="bg-cropper-image"
                 style={{
                   backgroundImage: `url("${previewUrl}")`,
-                  backgroundPosition: `${draft.offsetX}% ${draft.offsetY}%`,
-                  transform: `scale(${draft.scale})`,
+                  backgroundPosition: "center",
+                  transform: `scale(${draft.scale}) translate(${draft.scale > 1 ? (50 - draft.offsetX) * (draft.scale - 1) / draft.scale : 0}%, ${draft.scale > 1 ? (50 - draft.offsetY) * (draft.scale - 1) / draft.scale : 0}%)`,
                   filter: draft.blur > 0 ? `blur(${draft.blur * 0.4}px)` : undefined,
                 }}
               />

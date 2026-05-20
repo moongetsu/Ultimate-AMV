@@ -134,6 +134,36 @@
   align-items: center;
   gap: 8px;
 }
+/* Override the install-btn list-row look (underline + grid layout, designed
+   for the setup screen) when used in this modal's action bar. Pill-style
+   buttons with fixed height eliminate any baseline drift between the left
+   group (Replace / Remove / Reset) and the right group (Cancel / Apply). */
+.bg-customizer-actions .install-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12.5px;
+}
+.bg-customizer-actions .install-btn:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.07);
+  transform: none;
+}
+.bg-customizer-actions .install-btn.is-primary {
+  border-color: rgb(var(--theme-accent-rgb) / 0.55);
+  background: rgb(var(--theme-accent-rgb) / 0.16);
+}
+.bg-customizer-actions .install-btn.is-primary:hover:not(:disabled) {
+  background: rgb(var(--theme-accent-rgb) / 0.24);
+}
+.bg-customizer-actions .install-btn span {
+  font-size: 12.5px;
+}
 .bg-customizer-tabs {
   display: inline-flex;
   align-items: center;

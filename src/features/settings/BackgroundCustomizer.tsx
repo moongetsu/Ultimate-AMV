@@ -16,6 +16,7 @@ import {
   WALLPAPER_FPS_OPTIONS,
   WALLPAPER_VIDEO_EXTENSIONS,
 } from "../../lib/constants";
+import { computeRecommendedDimFromImage } from "../../lib/background";
 import { clampNumber } from "../../lib/numbers";
 import { fileName } from "../../lib/paths";
 import { extensionAccept, useFileDrop } from "../../lib/useFileDrop";
@@ -94,11 +95,17 @@ export function BackgroundCustomizer({
     setBusy(true);
     try {
       const savedPath = await invoke<string>("save_background_image", { source });
+      // Sample the image's brightness and prefill the Dim slider with a
+      // recommended value so labels/headings stay readable on bright
+      // wallpapers. Null = couldn't read (CORS or decode); leave the
+      // existing dim untouched in that case.
+      const recommendedDim = await computeRecommendedDimFromImage(convertFileSrc(savedPath));
       update({
         imagePath: savedPath,
         scale: 1,
         offsetX: 50,
         offsetY: 50,
+        ...(recommendedDim !== null ? { dim: recommendedDim } : {}),
       });
     } catch (e) {
       setError(readBridgeError(e));

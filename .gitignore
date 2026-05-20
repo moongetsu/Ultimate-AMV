@@ -22,6 +22,12 @@ tmp/
 temp/
 *.tmp
 temp.txt
+temp.md
+
+# Agent-generated scratch reports at repo root. Local-only.
+/TEST_AGENT_PROMPT.md
+/TEST_FAILURES.md
+/TEST_SUMMARY.md
 
 # Python.
 __pycache__/

@@ -141,22 +141,14 @@ describe('AnikaiBrowser', () => {
     expect(screen.getByRole('button', { name: /AniKai/i })).toBeInTheDocument()
   })
 
-  it('renders AniWaves as an option in the provider select', () => {
+  it('renders AniWaves as a provider button', () => {
     render(<AnikaiBrowser {...defaultProps} />)
-    const trigger = screen.getByRole('button', { name: /AniKai/i })
-    fireEvent.click(trigger)
-    const options = screen.getAllByRole('option')
-    const labels = options.map((o) => o.textContent)
-    expect(labels).toContain('AniWaves')
+    expect(screen.getByRole('button', { name: /AniWaves/i })).toBeInTheDocument()
   })
 
-  it('renders Custom URL as an option', () => {
+  it('renders Custom as a provider button', () => {
     render(<AnikaiBrowser {...defaultProps} />)
-    const trigger = screen.getByRole('button', { name: /AniKai/i })
-    fireEvent.click(trigger)
-    const options = screen.getAllByRole('option')
-    const labels = options.map((o) => o.textContent)
-    expect(labels).toContain('Custom URL')
+    expect(screen.getByRole('button', { name: /^Custom$/i })).toBeInTheDocument()
   })
 
   it('renders the address bar input', () => {
@@ -170,24 +162,20 @@ describe('AnikaiBrowser', () => {
     expect(input.readOnly).toBe(true)
   })
 
-  it('switching to Custom URL makes the address bar editable', async () => {
+  it('switching to Custom makes the address bar editable', async () => {
     render(<AnikaiBrowser {...defaultProps} />)
-    const trigger = screen.getByRole('button', { name: /AniKai/i })
-    fireEvent.click(trigger)
-    const customOption = screen.getByRole('option', { name: /Custom URL/i })
-    fireEvent.click(customOption)
+    const customButton = screen.getByRole('button', { name: /^Custom$/i })
+    fireEvent.click(customButton)
     await waitFor(() => {
       const input = screen.getByRole('textbox', { name: /Provider address/i }) as HTMLInputElement
       expect(input.readOnly).toBe(false)
     })
   })
 
-  it('shows a Go button in custom URL mode', async () => {
+  it('shows a Go button in custom mode', async () => {
     render(<AnikaiBrowser {...defaultProps} />)
-    const trigger = screen.getByRole('button', { name: /AniKai/i })
-    fireEvent.click(trigger)
-    const customOption = screen.getByRole('option', { name: /Custom URL/i })
-    fireEvent.click(customOption)
+    const customButton = screen.getByRole('button', { name: /^Custom$/i })
+    fireEvent.click(customButton)
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Go' })).toBeInTheDocument()
     })

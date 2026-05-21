@@ -3,10 +3,12 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
   Film,
   Image as ImageIcon,
   Loader2,
+  Lock,
   Trash2,
   Upload,
   X,
@@ -26,6 +28,12 @@ import { Dropdown } from "../../components/Dropdown";
 const BG_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "bmp", "gif"];
 const bgImageAccept = extensionAccept(BG_IMAGE_EXTENSIONS);
 const bgVideoAccept = extensionAccept(WALLPAPER_VIDEO_EXTENSIONS);
+
+const LEGIBILITY_NOTICE_TEXT =
+  "Bright wallpapers can wash out fine text and buttons. If the UI gets hard to read, raise the Dim slider, add some Blur, or pick a darker image.";
+const LEGIBILITY_NOTICE_TYPING_MS = 34;
+const LEGIBILITY_NOTICE_UNLOCK_MS = 10000;
+const LEGIBILITY_NOTICE_LEAVE_MS = 700;
 
 type TabId = "image" | "video";
 
@@ -53,6 +61,42 @@ export function BackgroundCustomizer({
   const [sourceFps, setSourceFps] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [transcodeProgress, setTranscodeProgress] = React.useState<WallpaperProgress | null>(null);
+  const [legibilityPhase, setLegibilityPhase] = React.useState<"counting" | "ready" | "leaving" | "gone">("counting");
+  const [typedChars, setTypedChars] = React.useState(1);
+  const [unlockSecondsLeft, setUnlockSecondsLeft] = React.useState(
+    Math.round(LEGIBILITY_NOTICE_UNLOCK_MS / 1000),
+  );
+  React.useEffect(() => {
+    let idx = 1;
+    const typeId = window.setInterval(() => {
+      idx += 1;
+      setTypedChars(idx);
+      if (idx >= LEGIBILITY_NOTICE_TEXT.length) {
+        window.clearInterval(typeId);
+      }
+    }, LEGIBILITY_NOTICE_TYPING_MS);
+    const tickId = window.setInterval(() => {
+      setUnlockSecondsLeft((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    const readyId = window.setTimeout(() => {
+      setLegibilityPhase("ready");
+      window.clearInterval(tickId);
+    }, LEGIBILITY_NOTICE_UNLOCK_MS);
+    return () => {
+      window.clearInterval(typeId);
+      window.clearInterval(tickId);
+      window.clearTimeout(readyId);
+    };
+  }, []);
+  const dismissLegibilityNotice = React.useCallback(() => {
+    setLegibilityPhase((phase) => {
+      if (phase !== "ready") return phase;
+      window.setTimeout(() => setLegibilityPhase("gone"), LEGIBILITY_NOTICE_LEAVE_MS);
+      return "leaving";
+    });
+  }, []);
+  const legibilityLocked = legibilityPhase !== "gone";
+  const legibilityTyping = typedChars < LEGIBILITY_NOTICE_TEXT.length;
   const frameRef = React.useRef<HTMLDivElement | null>(null);
   const dragRef = React.useRef<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
   const draftRef = React.useRef(draft);
@@ -470,13 +514,45 @@ export function BackgroundCustomizer({
 
   return (
     <div className="bg-customizer-backdrop" role="dialog" aria-label="Background customizer">
-      <div className="bg-customizer">
+      <div className={`bg-customizer${legibilityLocked ? " is-locked" : ""}`}>
         <div className="bg-customizer-header">
           <span>Customize background</span>
           <button type="button" className="bg-customizer-close" onClick={onCancel} aria-label="Close">
             <X size={16} />
           </button>
         </div>
+
+        {legibilityPhase !== "gone" && (
+          <div className={`bg-customizer-warning${legibilityPhase === "leaving" ? " is-leaving" : ""}`}>
+            <AlertTriangle size={15} strokeWidth={2.2} />
+            <span className="bg-customizer-warning-text" role="status" aria-live="polite">
+              {LEGIBILITY_NOTICE_TEXT.slice(0, typedChars)}
+              {legibilityTyping && (
+                <span className="bg-customizer-warning-caret" aria-hidden="true" />
+              )}
+            </span>
+            <button
+              type="button"
+              className={`bg-customizer-warning-dismiss${legibilityPhase !== "counting" ? " is-ready" : ""}`}
+              onClick={dismissLegibilityNotice}
+              disabled={legibilityPhase !== "ready"}
+              aria-label={
+                legibilityPhase === "counting"
+                  ? `Dismiss available in ${unlockSecondsLeft} seconds`
+                  : "Got it, dismiss and unlock controls"
+              }
+            >
+              {legibilityPhase === "counting" ? (
+                <>
+                  <Lock size={11} strokeWidth={2.4} aria-hidden="true" />
+                  <span aria-hidden="true">{unlockSecondsLeft}s</span>
+                </>
+              ) : (
+                <Check size={14} strokeWidth={2.8} aria-hidden="true" />
+              )}
+            </button>
+          </div>
+        )}
 
         <div className="bg-customizer-tabs" role="tablist">
           <button

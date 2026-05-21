@@ -116,6 +116,15 @@ export function SceneViewerModal({
     setDuration(0);
     setIsPlaying(false);
 
+    if (clip.id === "merged-preview") {
+      setRender({
+        status: "ready",
+        src: convertFileSrc(clip.path),
+        cached: true,
+      });
+      return undefined;
+    }
+
     void invoke<string>("scene_clip_render", {
       sceneId: clip.id,
       sourcePath: clip.path,

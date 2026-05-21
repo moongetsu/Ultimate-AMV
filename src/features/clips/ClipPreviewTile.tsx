@@ -172,7 +172,7 @@ export function ClipPreviewTile({
           </span>
         )}
         <span className="clip-tile-scrim" />
-        <span className="clip-source-badge">{clip.sourceName}</span>
+        <span className="clip-source-badge">{clip.isUnified ? "Merged" : clip.sourceName}</span>
         <span className="clip-tile-meta">
           <strong>{clip.label}</strong>
           <small>{clip.range}</small>

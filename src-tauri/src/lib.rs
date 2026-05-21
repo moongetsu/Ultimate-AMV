@@ -336,6 +336,7 @@ pub fn run() {
             video_cmds::video_transcode,
             clips::clip_export,
             clips::clip_export_merged,
+            clips::clip_preview_merge,
             video_cmds::video_gpu_status,
             video_cmds::video_source_codec,
             preview::clip_preview_generate,

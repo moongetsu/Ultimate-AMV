@@ -2,7 +2,7 @@ import React from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Clapperboard, Film, Info, Loader2, Scissors, Upload, X, Zap } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Clapperboard, Film, Info, Loader2, Play, Scissors, Upload, X, Zap } from "lucide-react";
 import { Dropdown } from "../../components/Dropdown";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import {
@@ -104,6 +104,10 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   // never appeared for clips clicked before their WebP was ready - the
   // very case the poster was meant to help with.
   const [viewerClipId, setViewerClipId] = React.useState<string | null>(null);
+  const [isPreviewMerging, setIsPreviewMerging] = React.useState(false);
+  const [mergedPreviewClip, setMergedPreviewClip] = React.useState<ClipPreviewItem | null>(null);
+  const [activeGridItems, setActiveGridItems] = React.useState<string[][] | null>(null);
+  const [unifiedPreviews, setUnifiedPreviews] = React.useState<Record<string, ClipPreviewItem>>({});
   const [exportSession, setExportSession] = React.useState<ClipExportSession | null>(null);
   const [exportMinimized, setExportMinimized] = React.useState(false);
   const exportSessionRef = React.useRef<ClipExportSession | null>(null);
@@ -317,6 +321,8 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     setMergeMode(false);
     setCompatModal(null);
     setConvertedSources({});
+    setActiveGridItems(null);
+    setUnifiedPreviews({});
 
     // Video picked, high intent to extract - warm up the server
     if (clipMode !== "cpu") {
@@ -375,18 +381,68 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     });
   }, [result, previewStates]);
 
-  const hasClips = clips.length > 0;
+  const displayedClips = React.useMemo<ClipPreviewItem[]>(() => {
+    if (!clips || clips.length === 0) return [];
+    if (!activeGridItems) return clips;
+
+    return activeGridItems.map((ids) => {
+      if (ids.length === 1) {
+        return clips.find((c) => c.id === ids[0])!;
+      } else {
+        const constituentClips = ids.map(id => clips.find(c => c.id === id)!).filter(Boolean);
+        if (constituentClips.length === 0) return null as any;
+
+        const first = constituentClips[0];
+        const combinedDuration = constituentClips.reduce((sum, c) => sum + (c.sourceEnd - c.sourceStart), 0);
+        const indices = constituentClips.map((c) => c.index + 1).join("+");
+        const combinedId = `unified-${constituentClips.map((c) => c.id).join("_")}`;
+
+        return {
+          id: combinedId,
+          index: first.index,
+          label: `Merged Clip (${indices})`,
+          range: `${constituentClips.length} clips merged · ${combinedDuration.toFixed(1)}s`,
+          sourceName: first.sourceName,
+          sourceSrc: first.sourceSrc,
+          sourceStart: first.sourceStart,
+          sourceEnd: first.sourceStart + combinedDuration,
+          previewStart: first.previewStart,
+          previewEnd: first.previewEnd,
+          previewState: previewStates[combinedId] || first.previewState,
+          fps: first.fps,
+          path: first.path,
+          isUnified: true,
+          segments: constituentClips.flatMap((c) =>
+            c.isUnified && c.segments
+              ? c.segments
+              : [{
+                  source: c.path!,
+                  start: c.sourceStart,
+                  end: c.sourceEnd,
+                  index: c.index,
+                  fps: c.fps,
+                }]
+          ),
+        };
+      }
+    }).filter(Boolean);
+  }, [clips, activeGridItems, previewStates]);
+
+  const hasClips = displayedClips.length > 0;
   const viewerClip = React.useMemo(
-    () => (viewerClipId ? clips.find((c) => c.id === viewerClipId) ?? null : null),
-    [viewerClipId, clips],
+    () => {
+      if (viewerClipId === "merged-preview") return mergedPreviewClip;
+      return viewerClipId ? displayedClips.find((c) => c.id === viewerClipId) ?? null : null;
+    },
+    [viewerClipId, displayedClips, mergedPreviewClip],
   );
   const selectedCount = selectedClipIds.size;
   const canExtract = selectedVideos.length > 0 && !isExtracting;
   const clipCancellingRef = React.useRef(false);
   const clipAbortRef = React.useRef<((reason: Error) => void) | null>(null);
   const readyPreviewCount = React.useMemo(
-    () => clips.reduce((count, clip) => count + (clip.previewState?.status === "ready" ? 1 : 0), 0),
-    [clips],
+    () => displayedClips.reduce((count, clip) => count + (clip.previewState?.status === "ready" ? 1 : 0), 0),
+    [displayedClips],
   );
   const exportOptions = React.useMemo(
     () => clipExportOptions(clipMode, gpuStatus),
@@ -426,11 +482,11 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   const clipRows = React.useMemo<ClipPreviewItem[][]>(() => {
     if (!hasClips) return [];
     const rows: ClipPreviewItem[][] = [];
-    for (let i = 0; i < clips.length; i += gridCols) {
-      rows.push(clips.slice(i, i + gridCols));
+    for (let i = 0; i < displayedClips.length; i += gridCols) {
+      rows.push(displayedClips.slice(i, i + gridCols));
     }
     return rows;
-  }, [clips, gridCols, hasClips]);
+  }, [displayedClips, gridCols, hasClips]);
 
   const activeGridClipIds = React.useMemo(() => {
     const active = new Set<string>();
@@ -616,6 +672,8 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     setSelectedClipIds(new Set());
     setMergeOrder([]);
     setMergeMode(false);
+    setActiveGridItems(null);
+    setUnifiedPreviews({});
     setProgress({
       type: "progress",
       stage: "starting",
@@ -810,8 +868,8 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   }
 
   function selectRange(fromId: string, toId: string, addToExisting = false) {
-    const fromIndex = clips.findIndex((c) => c.id === fromId);
-    const toIndex = clips.findIndex((c) => c.id === toId);
+    const fromIndex = displayedClips.findIndex((c) => c.id === fromId);
+    const toIndex = displayedClips.findIndex((c) => c.id === toId);
     if (fromIndex === -1 || toIndex === -1) return;
 
     const start = Math.min(fromIndex, toIndex);
@@ -820,7 +878,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     setSelectedClipIds((current) => {
       const next = addToExisting ? new Set(current) : new Set<string>();
       for (let i = start; i <= end; i++) {
-        next.add(clips[i].id);
+        next.add(displayedClips[i].id);
       }
       return next;
     });
@@ -830,8 +888,8 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   function jumpToSelection(direction: "next" | "prev") {
     if (selectedClipIds.size === 0) return;
     const ordered: { id: string; index: number }[] = [];
-    for (let i = 0; i < clips.length; i++) {
-      if (selectedClipIds.has(clips[i].id)) ordered.push({ id: clips[i].id, index: i });
+    for (let i = 0; i < displayedClips.length; i++) {
+      if (selectedClipIds.has(displayedClips[i].id)) ordered.push({ id: displayedClips[i].id, index: i });
     }
     if (ordered.length === 0) return;
     const cursorId = selectionCursorIdRef.current;
@@ -852,15 +910,38 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
 
   function toggleAllClipSelection() {
     if (!hasClips) return;
-    setSelectedClipIds((current) => {
-      if (current.size === clips.length) {
+        setSelectedClipIds((current) => {
+      if (current.size === displayedClips.length) {
         return new Set();
       }
-      return new Set(clips.map((clip) => clip.id));
+      return new Set(displayedClips.map((clip) => clip.id));
     });
   }
 
-  function handleClipClick(
+  const mergeOrderedClips = React.useMemo(
+    () =>
+      mergeOrder
+        .map((id) => displayedClips.find((clip) => clip.id === id))
+        .filter((clip): clip is ClipPreviewItem => Boolean(clip)),
+    [mergeOrder, displayedClips],
+  );
+
+  const mergeFilenameStem = React.useMemo(
+    () => {
+      const parts: string[] = [];
+      mergeOrderedClips.forEach((clip) => {
+        if (clip.isUnified && clip.segments) {
+          parts.push(clip.segments.map((s) => s.index + 1).join("+"));
+        } else {
+          parts.push((clip.index + 1).toString());
+        }
+      });
+      return parts.join("+");
+    },
+    [mergeOrderedClips],
+  );
+
+  async function handleClipClick(
     clip: ClipPreviewItem,
     modifiers: { ctrl: boolean; shift: boolean },
   ) {
@@ -889,9 +970,247 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
       return;
     }
 
-    // Plain click: open scene viewer with audio. Selection lives on the corner
+    // Plain click
+    if (clip.isUnified) {
+      if (unifiedPreviews[clip.id]) {
+        setMergedPreviewClip(unifiedPreviews[clip.id]);
+        setViewerClipId("merged-preview");
+
+        const existingState = previewStates[clip.id];
+        if (!existingState || (existingState.status !== "ready" && existingState.status !== "rendering")) {
+          const cachedMp4Path = unifiedPreviews[clip.id].path!;
+          const cachedMp4Duration = unifiedPreviews[clip.id].sourceEnd;
+          void (async () => {
+            setPreviewStates((current) => ({
+              ...current,
+              [clip.id]: { status: "rendering" },
+            }));
+            try {
+              const webpRaw = await invoke<string>("clip_preview_generate", {
+                sceneId: clip.id,
+                sourcePath: cachedMp4Path,
+                start: 0,
+                end: cachedMp4Duration,
+                fps: clip.fps || 24,
+              });
+              const webpPayload = parseBridgePayload<{ path: string; duration: number }>(webpRaw);
+              setPreviewStates((current) => ({
+                ...current,
+                [clip.id]: {
+                  status: "ready",
+                  path: webpPayload.path,
+                  src: convertFileSrc(webpPayload.path),
+                  duration: webpPayload.duration,
+                },
+              }));
+            } catch (webpErr) {
+              console.error("Failed to generate WebP preview for unified clip:", webpErr);
+              setPreviewStates((current) => ({
+                ...current,
+                [clip.id]: { status: "error" },
+              }));
+            }
+          })();
+        }
+        return;
+      }
+
+      if (isPreviewMerging) return;
+      setError(null);
+      setIsPreviewMerging(true);
+
+      try {
+        const raw = await invoke<string>("clip_preview_merge", {
+          clips: clip.segments,
+        });
+        const payload = parseBridgePayload<{ path: string; duration: number }>(raw);
+        
+        const mockClip: ClipPreviewItem = {
+          id: "merged-preview",
+          index: 9999,
+          label: clip.label,
+          range: clip.range,
+          sourceName: "Merged Preview",
+          sourceSrc: "",
+          sourceStart: 0,
+          sourceEnd: payload.duration,
+          previewStart: 0,
+          previewEnd: payload.duration,
+          path: payload.path,
+          fps: clip.fps || 24,
+        };
+
+        setUnifiedPreviews((current) => ({ ...current, [clip.id]: mockClip }));
+        setMergedPreviewClip(mockClip);
+        setViewerClipId("merged-preview");
+
+        // Immediately trigger WebP preview generation in the background!
+        setPreviewStates((current) => ({
+          ...current,
+          [clip.id]: { status: "rendering" },
+        }));
+        void (async () => {
+          try {
+            const webpRaw = await invoke<string>("clip_preview_generate", {
+              sceneId: clip.id,
+              sourcePath: payload.path,
+              start: 0,
+              end: payload.duration,
+              fps: clip.fps || 24,
+            });
+            const webpPayload = parseBridgePayload<{ path: string; duration: number }>(webpRaw);
+            setPreviewStates((current) => ({
+              ...current,
+              [clip.id]: {
+                status: "ready",
+                path: webpPayload.path,
+                src: convertFileSrc(webpPayload.path),
+                duration: webpPayload.duration,
+              },
+            }));
+          } catch (webpErr) {
+            console.error("Failed to generate WebP preview for unified clip:", webpErr);
+            setPreviewStates((current) => ({
+              ...current,
+              [clip.id]: { status: "error" },
+            }));
+          }
+        })();
+
+      } catch (e) {
+        const errorText = readBridgeError(e);
+        setError(errorText);
+      } finally {
+        setIsPreviewMerging(false);
+      }
+      return;
+    }
+
+    // Plain click for standard clip: open scene viewer with audio. Selection lives on the corner
     // button (clip-corner-select) and the modifier paths above.
     setViewerClipId(clip.id);
+  }
+
+  function unifySelectedInGrid() {
+    if (mergeOrder.length < 2) return;
+
+    const currentLayout = activeGridItems ?? clips.map((c) => [c.id]);
+    const selectedUnderlyingIds: string[] = [];
+    const groupsToRemove = new Set<number>();
+
+    mergeOrder.forEach((selectedId) => {
+      const dispClip = displayedClips.find((c) => c.id === selectedId);
+      if (!dispClip) return;
+
+      let foundGroupIndex = -1;
+      if (dispClip.isUnified) {
+        foundGroupIndex = currentLayout.findIndex((group) => {
+          if (group.length <= 1) return false;
+          const constituent = group.map(id => clips.find(c => c.id === id)!).filter(Boolean);
+          const generatedId = `unified-${constituent.map((c) => c.id).join("_")}`;
+          return generatedId === selectedId;
+        });
+      } else {
+        foundGroupIndex = currentLayout.findIndex(
+          (group) => group.length === 1 && group[0] === selectedId
+        );
+      }
+
+      if (foundGroupIndex !== -1) {
+        groupsToRemove.add(foundGroupIndex);
+        selectedUnderlyingIds.push(...currentLayout[foundGroupIndex]);
+      }
+    });
+
+    if (selectedUnderlyingIds.length < 2) return;
+
+    const nextLayout: string[][] = [];
+    let inserted = false;
+
+    currentLayout.forEach((group, index) => {
+      if (groupsToRemove.has(index)) {
+        if (!inserted) {
+          nextLayout.push(selectedUnderlyingIds);
+          inserted = true;
+        }
+      } else {
+        nextLayout.push(group);
+      }
+    });
+
+    setActiveGridItems(nextLayout);
+    setMergeOrder([]);
+    setMergeMode(false);
+
+    // Automatically trigger preview merge & WebP generation in the background!
+    const combinedId = `unified-${selectedUnderlyingIds.join("_")}`;
+    const constituentClips = selectedUnderlyingIds.map(id => clips.find(c => c.id === id)!).filter(Boolean);
+    const segments = constituentClips.flatMap((c) =>
+      c.isUnified && c.segments
+        ? c.segments
+        : [{
+            source: c.path!,
+            start: c.sourceStart,
+            end: c.sourceEnd,
+            index: c.index,
+            fps: c.fps,
+          }]
+    );
+
+    void (async () => {
+      setPreviewStates((current) => ({
+        ...current,
+        [combinedId]: { status: "rendering" },
+      }));
+
+      try {
+        const raw = await invoke<string>("clip_preview_merge", {
+          clips: segments,
+        });
+        const payload = parseBridgePayload<{ path: string; duration: number }>(raw);
+        
+        const mockClip: ClipPreviewItem = {
+          id: "merged-preview",
+          index: 9999,
+          label: `Merged Clip (${constituentClips.map((c) => c.index + 1).join("+")})`,
+          range: `${constituentClips.length} clips merged · ${payload.duration.toFixed(1)}s`,
+          sourceName: "Merged Preview",
+          sourceSrc: "",
+          sourceStart: 0,
+          sourceEnd: payload.duration,
+          previewStart: 0,
+          previewEnd: payload.duration,
+          path: payload.path,
+          fps: constituentClips[0]?.fps || 24,
+        };
+
+        setUnifiedPreviews((current) => ({ ...current, [combinedId]: mockClip }));
+
+        const webpRaw = await invoke<string>("clip_preview_generate", {
+          sceneId: combinedId,
+          sourcePath: payload.path,
+          start: 0,
+          end: payload.duration,
+          fps: constituentClips[0]?.fps || 24,
+        });
+        const webpPayload = parseBridgePayload<{ path: string; duration: number }>(webpRaw);
+        setPreviewStates((current) => ({
+          ...current,
+          [combinedId]: {
+            status: "ready",
+            path: webpPayload.path,
+            src: convertFileSrc(webpPayload.path),
+            duration: webpPayload.duration,
+          },
+        }));
+      } catch (err) {
+        console.error("Failed to generate background preview for merged clip:", err);
+        setPreviewStates((current) => ({
+          ...current,
+          [combinedId]: { status: "error" },
+        }));
+      }
+    })();
   }
 
   function toggleMergeOrder(clipId: string) {
@@ -918,18 +1237,57 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     return map;
   }, [mergeOrder]);
 
-  const mergeOrderedClips = React.useMemo(
-    () =>
-      mergeOrder
-        .map((id) => clips.find((clip) => clip.id === id))
-        .filter((clip): clip is ClipPreviewItem => Boolean(clip)),
-    [mergeOrder, clips],
-  );
+  async function startPreviewMerge() {
+    if (mergeOrderedClips.length < 2 || isExtracting || isPreviewMerging) return;
 
-  const mergeFilenameStem = React.useMemo(
-    () => mergeOrderedClips.map((clip) => clip.index + 1).join("+"),
-    [mergeOrderedClips],
-  );
+    setError(null);
+    setIsPreviewMerging(true);
+
+    const exportClips = mergeOrderedClips.flatMap((clip) => {
+      if (clip.isUnified && clip.segments) {
+        return clip.segments;
+      }
+      return [
+        {
+          source: clip.path!,
+          start: clip.sourceStart,
+          end: clip.sourceEnd,
+          index: clip.index,
+          fps: clip.fps,
+        },
+      ];
+    });
+
+    try {
+      const raw = await invoke<string>("clip_preview_merge", {
+        clips: exportClips,
+      });
+      const payload = parseBridgePayload<{ path: string; duration: number }>(raw);
+      
+      const mockClip: ClipPreviewItem = {
+        id: "merged-preview",
+        index: 9999,
+        label: `Merged Preview (${mergeFilenameStem})`,
+        range: `${mergeOrderedClips.length} clips combined`,
+        sourceName: "Merged Preview",
+        sourceSrc: "",
+        sourceStart: 0,
+        sourceEnd: payload.duration,
+        previewStart: 0,
+        previewEnd: payload.duration,
+        path: payload.path,
+        fps: 24,
+      };
+
+      setMergedPreviewClip(mockClip);
+      setViewerClipId("merged-preview");
+    } catch (e) {
+      const errorText = readBridgeError(e);
+      setError(errorText);
+    } finally {
+      setIsPreviewMerging(false);
+    }
+  }
 
   async function startMergeExport() {
     if (mergeOrderedClips.length < 2 || isExtracting) return;
@@ -945,13 +1303,20 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     });
     if (!selected || Array.isArray(selected)) return;
 
-    const exportClips = mergeOrderedClips.map((clip) => ({
-      source: clip.path,
-      start: clip.sourceStart,
-      end: clip.sourceEnd,
-      index: clip.index,
-      fps: clip.fps,
-    }));
+    const exportClips = mergeOrderedClips.flatMap((clip) => {
+      if (clip.isUnified && clip.segments) {
+        return clip.segments;
+      }
+      return [
+        {
+          source: clip.path!,
+          start: clip.sourceStart,
+          end: clip.sourceEnd,
+          index: clip.index,
+          fps: clip.fps,
+        },
+      ];
+    });
 
     setError(null);
     setIsExtracting(true);
@@ -1052,7 +1417,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     if (!selected || Array.isArray(selected)) return;
 
     const outDir = selected;
-    const selectedClips = clips.filter((clip) => selectedClipIds.has(clip.id));
+    const selectedClips = displayedClips.filter((clip) => selectedClipIds.has(clip.id));
     if (selectedClips.length === 0) return;
 
     const rows: ClipExportRow[] = selectedClips.map((clip) => ({
@@ -1105,20 +1470,29 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
         );
 
         try {
-          await invoke<string>("clip_export", {
-            clips: [
-              {
-                source: clip.path,
-                start: clip.sourceStart,
-                end: clip.sourceEnd,
-                index,
-                fps: clip.fps,
-              },
-            ],
+          if (clip.isUnified && clip.segments) {
+            await invoke<string>("clip_export_merged", {
+              clips: clip.segments,
+              outputDir: outDir,
+              preset: exportFormat,
+              qualityValue: clipQualitySpec(exportFormat) ? exportQuality[exportFormat] : null,
+            });
+          } else {
+            await invoke<string>("clip_export", {
+              clips: [
+                {
+                  source: clip.path,
+                  start: clip.sourceStart,
+                  end: clip.sourceEnd,
+                  index,
+                  fps: clip.fps,
+                },
+              ],
             outputDir: outDir,
             preset: exportFormat,
             qualityValue: clipQualitySpec(exportFormat) ? exportQuality[exportFormat] : null,
           });
+          }
           setExportSession((current) =>
             current
               ? {
@@ -1194,7 +1568,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
 
   const runMessage = error
     ?? (result
-      ? `${result.sceneCount} scenes ready - ${readyPreviewCount}/${clips.length} previews cached`
+      ? `${result.sceneCount} scenes ready - ${readyPreviewCount}/${displayedClips.length} previews cached`
       : progress?.message ?? "");
 
   return (
@@ -1334,12 +1708,12 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
 
               <button
                 type="button"
-                className={`clip-tool-button spring-motion ${hasClips && selectedCount === clips.length ? "is-active" : ""}`}
+                className={`clip-tool-button spring-motion ${hasClips && selectedCount === displayedClips.length ? "is-active" : ""}`}
                 disabled={!hasClips || isExtracting}
                 onClick={toggleAllClipSelection}
               >
                 <CheckCircle2 size={18} strokeWidth={2} />
-                <span>{hasClips && selectedCount === clips.length ? "Clear selection" : "Select all clips"}</span>
+                <span>{hasClips && selectedCount === displayedClips.length ? "Clear selection" : "Select all clips"}</span>
               </button>
             </>
           )}
@@ -1355,20 +1729,56 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
           </button>
 
           {mergeMode && (
-            <button
-              type="button"
-              className="clip-confirm-button spring-motion accent-glow"
-              disabled={mergeOrder.length < 2 || isExtracting}
-              onClick={startMergeExport}
-              title={mergeOrder.length < 2 ? "Select at least 2 clips to merge" : `Merge into ${mergeFilenameStem}.mov`}
-            >
-              <CheckCircle2 size={17} strokeWidth={2.1} />
-              <span>
-                {mergeOrder.length < 2
-                  ? "Select 2+ clips"
-                  : `Merge into ${mergeFilenameStem}.mov`}
-              </span>
-            </button>
+            <>
+              <button
+                type="button"
+                className="clip-confirm-button spring-motion"
+                disabled={mergeOrder.length < 2 || isExtracting || isPreviewMerging}
+                onClick={startPreviewMerge}
+                title={mergeOrder.length < 2 ? "Select at least 2 clips to preview" : "Preview merged clips"}
+              >
+                {isPreviewMerging ? (
+                  <Loader2 className="is-spinning" size={17} strokeWidth={2.1} />
+                ) : (
+                  <Play size={17} strokeWidth={2.1} />
+                )}
+                <span>
+                  {mergeOrder.length < 2
+                    ? "Select 2+ clips"
+                    : isPreviewMerging ? "Merging..." : "Preview merge"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className="clip-confirm-button spring-motion"
+                disabled={mergeOrder.length < 2 || isExtracting}
+                onClick={unifySelectedInGrid}
+                title={mergeOrder.length < 2 ? "Select at least 2 clips to merge in real time" : "Merge selected clips in real time into a single grid card"}
+              >
+                <Film size={17} strokeWidth={2.1} />
+                <span>
+                  {mergeOrder.length < 2
+                    ? "Select 2+ clips"
+                    : "Merge in real time"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className="clip-confirm-button spring-motion accent-glow"
+                disabled={mergeOrder.length < 2 || isExtracting}
+                onClick={startMergeExport}
+                title={mergeOrder.length < 2 ? "Select at least 2 clips to merge" : `Merge into ${mergeFilenameStem}.mov`}
+              >
+                <CheckCircle2 size={17} strokeWidth={2.1} />
+                <span>
+                  {mergeOrder.length < 2
+                    ? "Select 2+ clips"
+                    : `Merge into ${mergeFilenameStem}.mov`}
+                </span>
+              </button>
+            </>
           )}
         </div>
 

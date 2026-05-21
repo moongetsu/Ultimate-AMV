@@ -5,6 +5,116 @@ All notable changes to Ultimate AMV are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] : 2026-05-22
+
+### Added
+- **AnimeSuge replaces AniKai as the default downloader provider.**
+  AniKai's servers shut down so the provider was retired. AnimeSuge
+  (`https://animesuge.cz`) takes its place with full identity
+  detection: the URL extractor reads `/anime/<slug>/ep-N` and the
+  HTML `<title>` parser splits on the LAST occurrence of "episode"
+  so titles that themselves contain the word still parse correctly.
+- **Per-site Referer detection for the Custom URL downloader.** The
+  in-app browser now sniffs the player iframe's origin (paths with
+  `/stream/`, `/embed/`, `/player/`, `/play/`, `/watch/` on a non-page,
+  non-telemetry host) and attaches it to the captured stream so yt-dlp
+  passes the CDN's hot-link check. Fixes the 403 Forbidden wall that
+  was hitting mewstream, megaplay, and other CDNs.
+- **yt-dlp impersonation on the anime path.** Anime-flow yt-dlp calls
+  (stream inspection + download) now pass `--impersonate
+  Chrome-116:Windows-10` so they clear Cloudflare's anti-bot wall.
+  The YouTube path is unchanged.
+- **Confirm-download modal opens on every Download click.** Detected
+  anime title, episode number, and save directory are pre-filled and
+  editable. Previously the modal only opened when detection missed;
+  now you get to review or correct the values for every download. The
+  default save path is always shown so it's clear where the file will
+  land if you don't pick a custom folder.
+- **Pre-flight legibility warning in the background customizer.** When
+  you open the Customize background modal, a red banner appears at the
+  top reading "Bright wallpapers can wash out fine text and buttons.
+  If the UI gets hard to read, raise the Dim slider, add some Blur,
+  or pick a darker image." The text types in over ~5 seconds; on the
+  right, a lock pill counts down 10s → 1s and then morphs into an
+  enabled checkmark you click to dismiss. Controls under the warning
+  are dimmed and locked until you acknowledge it.
+- **Clip select controls.** PR #6 from moongetsu landed real
+  keyboard/mouse selection: ctrl+click toggles a clip's selection.
+  The earlier double-click-to-select trigger and 250 ms click delay
+  were removed, so the grid feels immediate. Selected clips off
+  screen get a Jump pill that scrolls them into view, and hover
+  autoplayers stop running when the tile leaves the viewport so a
+  long episode no longer spins the CPU on previews you can't see.
+- **Content-fingerprint scene cache.** The clip extractor's scene
+  cache is now keyed by a content fingerprint instead of the file
+  path, so renaming or moving a video keeps the cached scene cuts
+  intact instead of forcing a re-scan.
+- **Discord invite button** in Settings → Theme & Social.
+- **Themed FPS Dropdown** in the background customizer's Live
+  wallpaper tab, replacing the native `<select>` so the picker
+  matches the rest of the app's UI instead of looking like a debug
+  element.
+- **Diagnostic firehose log** (`browser.media.request.full`) records
+  every WebView2 request seen by the sniffer. The log is written on
+  a background thread with a 5000-URL dedup set so the WebView2
+  callback never blocks on disk I/O. Used for site-specific debugging
+  on Custom URL downloads.
+
+### Changed
+- **Background customizer zoom/pan rewritten to use CSS translate.**
+  Big images pan smoothly instead of jittering as the browser
+  reflowed `background-position`. Action-bar buttons (Replace,
+  Remove, Reset, Cancel, Apply) were also made uniform in size and
+  style.
+- **Conversion panel layout tightened.** The action info (kicker +
+  description) was merged into the source card, and the run card on
+  the right shrunk to just its title block and the Start/Cancel
+  button so the layout doesn't feel front-heavy.
+- **Sniffer media-kind detection tightened.** A telemetry-host
+  blocklist (`jwpltx.com`, `googletagmanager.com`, etc.) plus a
+  static-asset extension filter (`.gif`, `.css`, `.js`, with
+  `.html`/`.htm` exempted as embed documents) means JWPlayer
+  `ping.gif` pings whose URLs embed `.m3u8` in a query parameter no
+  longer leak through as fake "Captured playback stream" candidates.
+  This was the bug that started the whole investigation.
+- **Default wallpaper Blur is now 5px.** Out of the box a freshly
+  applied wallpaper looks softer and is easier to read text on,
+  without dimming.
+- **Muted labels get a text-shadow halo under `has-app-bg`.** Section
+  kickers, breadcrumbs, helper copy, and other low-contrast text get
+  a subtle dark drop-shadow when a wallpaper is active. Invisible on
+  dark wallpapers; rescues legibility on bright ones with no impact
+  on layout.
+
+### Fixed
+- **Clip extractor click feedback feels snappy** instead of laggy
+  thanks to the removed 250 ms click delay (see Added above).
+- **AnimeSuge URLs detect the anime title** instead of returning
+  the literal word "Anime". `inferAnikaiTitle` now recognises both
+  `/watch/` (AniKai/AniWaves) and `/anime/` (AnimeSuge) URL
+  segments and rejects generic keyword fallbacks like "anime",
+  "watch", "browse", "search", "home".
+- **AnimeSuge identity requests scoped correctly.**
+  `is_anikai_identity_request` now requires BOTH `/anime/` and
+  (`/ep-` or `/ep/`) for AnimeSuge URLs, so unrelated requests with
+  `/ep-` in the path don't get misclassified as identity probes.
+
+### Removed
+- **AniKai default preset.** Servers shut down; replaced by
+  AnimeSuge (see Added above).
+- **Per-widget scrim layers** behind downloader mode tabs, queue
+  panel, clip extractor rail, settings cards, and conversion cards
+  (the three commits 694e1e2, 5ff8fe7, 7901397). They solved
+  legibility on bright wallpapers at the cost of covering the
+  wallpaper itself. Replaced by the pre-flight legibility warning
+  (see Added) plus the existing text-shadow halo, which keep the
+  wallpaper visible and let the user decide how much Dim/Blur to
+  apply.
+- **Forced Dim=10 / Blur=5 slider floors** and the mid-cycle
+  auto-luminance recommendation. Both were experimented with and
+  reverted; the only floor left is the new Blur default of 5px,
+  which the user can still drag to 0.
+
 ## [0.11.0] : 2026-05-20
 
 ### Added
@@ -111,6 +221,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   re-rendered after a filter change; they now cross-fade
   cleanly.
 
+[0.12.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.12.0
 [0.11.0]: https://github.com/ElishaPervez/Ultimate-AMV/releases/tag/v0.11.0
 
 ## [0.10.0] : 2026-05-19

@@ -928,15 +928,24 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
 
   const mergeFilenameStem = React.useMemo(
     () => {
-      const parts: string[] = [];
+      const parts: number[] = [];
       mergeOrderedClips.forEach((clip) => {
         if (clip.isUnified && clip.segments) {
-          parts.push(clip.segments.map((s) => s.index + 1).join("+"));
+          clip.segments.forEach((s) => parts.push(s.index + 1));
         } else {
-          parts.push((clip.index + 1).toString());
+          parts.push(clip.index + 1);
         }
       });
-      return parts.join("+");
+      if (parts.length === 0) return "";
+
+      const fullJoin = parts.join("+");
+      if (fullJoin.length <= 30) {
+        return fullJoin;
+      }
+
+      const min = Math.min(...parts);
+      const max = Math.max(...parts);
+      return `${min}-${max} (${parts.length} clips)`;
     },
     [mergeOrderedClips],
   );

@@ -4,7 +4,7 @@
  */
 
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockInvoke, mockInvokeFn } from '../../../tests/setup/tauri'
 import { BackgroundCustomizer } from './BackgroundCustomizer'
@@ -149,5 +149,56 @@ describe('BackgroundCustomizer', () => {
     renderCustomizer({ initial: stateWithImage })
     const zoomSlider = screen.getByRole('slider', { name: /Zoom/i })
     expect(zoomSlider).not.toBeDisabled()
+  })
+
+  it('locks controls until user dismisses the warning via the gated check button', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      renderCustomizer()
+      // Visible, typing caret, container locked, dismiss button shows lock + 10s, disabled.
+      expect(screen.getByRole('status')).toBeInTheDocument()
+      expect(document.querySelector('.bg-customizer-warning-caret')).toBeTruthy()
+      expect(document.querySelector('.bg-customizer.is-locked')).toBeTruthy()
+      const dismissBtn = screen.getByRole('button', { name: /Dismiss available in/i })
+      expect(dismissBtn).toBeDisabled()
+      expect(dismissBtn.textContent).toContain('10s')
+
+      // After 1s: countdown to 9s, still disabled.
+      act(() => { vi.advanceTimersByTime(1000) })
+      expect(screen.getByRole('button', { name: /Dismiss available in 9 seconds/i })).toBeDisabled()
+
+      // After 9s more (total 10s): button becomes the "Got it" check, enabled, still locked.
+      act(() => { vi.advanceTimersByTime(9000) })
+      const readyBtn = screen.getByRole('button', { name: /Got it/i })
+      expect(readyBtn).toBeEnabled()
+      expect(document.querySelector('.bg-customizer.is-locked')).toBeTruthy()
+
+      // Click dismisses: leaving class, still locked during fade.
+      await user.click(readyBtn)
+      expect(document.querySelector('.bg-customizer-warning.is-leaving')).toBeTruthy()
+      expect(document.querySelector('.bg-customizer.is-locked')).toBeTruthy()
+
+      // After 700ms fade: warning gone, lock lifted.
+      act(() => { vi.advanceTimersByTime(700) })
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+      expect(document.querySelector('.bg-customizer.is-locked')).toBeFalsy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('warning persists past 10s if user has not clicked the check button', () => {
+    vi.useFakeTimers()
+    try {
+      renderCustomizer()
+      act(() => { vi.advanceTimersByTime(30_000) })
+      // Still visible after 30s of inactivity - it is user-controlled now.
+      expect(screen.getByRole('status')).toBeInTheDocument()
+      expect(document.querySelector('.bg-customizer.is-locked')).toBeTruthy()
+      expect(screen.getByRole('button', { name: /Got it/i })).toBeEnabled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -16,7 +16,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader as AsyncBufReader};
 use crate::{
     app_root, apply_python_env, apply_python_env_async, canonical_input_path, clear_child_pid,
     clip_cli_path, cmd, content_fingerprint, emit_conversion_progress, ensure_tool, ffmpeg_listing,
-    find_tool, kill_child_pid, log_error, log_info, log_warn, python_exe,
+    find_tool, kill_child_pid, log_error, log_info, log_warn, probe_has_audio_stream, python_exe,
     run_ffmpeg_with_progress, sanitize_path_segment, serialize_clip_preview_done, short_stable_id,
     store_child_pid, truncate_log_text, append_app_log, CLIP_CHILD_PID, CLIP_SERVER,
     ConversionDone, H264_NVENC_AVAILABLE,
@@ -410,16 +410,24 @@ fn run_clip_export_merged(
 ) -> Result<String, String> {
     let root = app_root()?;
     let ffmpeg = find_tool(&root, "ffmpeg");
+    let ffprobe = find_tool(&root, "ffprobe");
     ensure_tool(&ffmpeg)?;
+    ensure_tool(&ffprobe)?;
 
     let out_dir = PathBuf::from(&output_dir);
     fs::create_dir_all(&out_dir).map_err(|e| format!("Could not create output directory: {e}"))?;
 
-    let base_name = clips
-        .iter()
-        .map(|c| (c.index + 1).to_string())
-        .collect::<Vec<_>>()
-        .join("+");
+    let parts: Vec<usize> = clips.iter().map(|c| c.index + 1).collect();
+    let base_name = {
+        let full_join = parts.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("+");
+        if full_join.len() <= 30 {
+            full_join
+        } else {
+            let min = parts.iter().min().copied().unwrap_or(1);
+            let max = parts.iter().max().copied().unwrap_or(1);
+            format!("{}-{} ({} clips)", min, max, parts.len())
+        }
+    };
     let ext = preset_extension(&preset);
     let mut output = out_dir.join(format!("{base_name}.{ext}"));
     let mut suffix = 1;
@@ -441,6 +449,14 @@ fn run_clip_export_merged(
         };
         input_index_for_clip.push(idx);
     }
+
+    // Probe which inputs actually have audio streams
+    let mut input_has_audio: Vec<bool> = Vec::with_capacity(input_paths.len());
+    for path in &input_paths {
+        let has_audio = probe_has_audio_stream(&ffprobe, path).unwrap_or(false);
+        input_has_audio.push(has_audio);
+    }
+    let any_has_audio = input_has_audio.iter().any(|&h| h);
 
     let mut args: Vec<String> = vec![
         "-y".to_string(),
@@ -466,26 +482,45 @@ fn run_clip_export_merged(
         filter_parts.push(format!(
             "[{input_idx}:v]trim=start={start:.3}:duration={duration:.3},setpts=PTS-STARTPTS[v{i}]"
         ));
-        filter_parts.push(format!(
-            "[{input_idx}:a]atrim=start={start:.3}:duration={duration:.3},asetpts=PTS-STARTPTS[a{i}]"
-        ));
-        concat_inputs.push_str(&format!("[v{i}][a{i}]"));
+        if any_has_audio {
+            let clip_has_audio = input_has_audio[input_idx];
+            if clip_has_audio {
+                filter_parts.push(format!(
+                    "[{input_idx}:a]atrim=start={start:.3}:duration={duration:.3},asetpts=PTS-STARTPTS[a{i}]"
+                ));
+            } else {
+                filter_parts.push(format!(
+                    "anullsrc=channel_layout=stereo:sample_rate=44100,atrim=duration={duration:.3},asetpts=PTS-STARTPTS[a{i}]"
+                ));
+            }
+            concat_inputs.push_str(&format!("[v{i}][a{i}]"));
+        } else {
+            concat_inputs.push_str(&format!("[v{i}]"));
+        }
     }
     let n = clips.len();
-    filter_parts.push(format!(
-        "{concat_inputs}concat=n={n}:v=1:a=1[outv][outa]"
-    ));
+    if any_has_audio {
+        filter_parts.push(format!(
+            "{concat_inputs}concat=n={n}:v=1:a=1[outv][outa]"
+        ));
+    } else {
+        filter_parts.push(format!(
+            "{concat_inputs}concat=n={n}:v=1:a=0[outv]"
+        ));
+    }
     args.push("-filter_complex".to_string());
     args.push(filter_parts.join(";"));
     args.push("-map".to_string());
     args.push("[outv]".to_string());
-    args.push("-map".to_string());
-    args.push("[outa]".to_string());
+    if any_has_audio {
+        args.push("-map".to_string());
+        args.push("[outa]".to_string());
+    }
 
     let encode_args: Vec<String> = match preset.as_str() {
         "gpu-intra" => {
             let qp = clamp_quality(quality_value, 10, 28, 16);
-            vec![
+            let mut v = vec![
                 "-c:v".to_string(), "hevc_nvenc".to_string(),
                 "-preset".to_string(), "p1".to_string(),
                 "-rc".to_string(), "constqp".to_string(),
@@ -494,69 +529,99 @@ fn run_clip_export_merged(
                 "-bf".to_string(), "0".to_string(),
                 "-profile:v".to_string(), "main10".to_string(),
                 "-highbitdepth".to_string(), "1".to_string(),
-                "-c:a".to_string(), "aac".to_string(),
-                "-b:a".to_string(), "320k".to_string(),
-            ]
+            ];
+            if any_has_audio {
+                v.extend([
+                    "-c:a".to_string(), "aac".to_string(),
+                    "-b:a".to_string(), "320k".to_string(),
+                ]);
+            }
+            v
         }
         "prores-lt" | "prores-hq" => {
             let profile = if preset == "prores-lt" { "1" } else { "3" };
-            vec![
+            let mut v = vec![
                 "-c:v".to_string(), "prores_ks".to_string(),
                 "-profile:v".to_string(), profile.to_string(),
                 "-pix_fmt".to_string(), "yuv422p10le".to_string(),
-                "-c:a".to_string(), "pcm_s16le".to_string(),
-            ]
+            ];
+            if any_has_audio {
+                v.extend([
+                    "-c:a".to_string(), "pcm_s16le".to_string(),
+                ]);
+            }
+            v
         }
         "h264-nvenc" => {
             let cq = clamp_quality(quality_value, 14, 28, 18);
-            vec![
+            let mut v = vec![
                 "-c:v".to_string(), "h264_nvenc".to_string(),
                 "-preset".to_string(), "p4".to_string(),
                 "-rc".to_string(), "constqp".to_string(),
                 "-cq".to_string(), cq.to_string(),
                 "-spatial-aq".to_string(), "1".to_string(),
                 "-temporal-aq".to_string(), "1".to_string(),
-                "-c:a".to_string(), "aac".to_string(),
-                "-b:a".to_string(), "320k".to_string(),
                 "-movflags".to_string(), "+faststart".to_string(),
-            ]
+            ];
+            if any_has_audio {
+                v.extend([
+                    "-c:a".to_string(), "aac".to_string(),
+                    "-b:a".to_string(), "320k".to_string(),
+                ]);
+            }
+            v
         }
         "av1-nvenc" => {
             let cq = clamp_quality(quality_value, 18, 34, 24);
-            vec![
+            let mut v = vec![
                 "-c:v".to_string(), "av1_nvenc".to_string(),
                 "-preset".to_string(), "p4".to_string(),
                 "-rc".to_string(), "constqp".to_string(),
                 "-cq".to_string(), cq.to_string(),
                 "-spatial-aq".to_string(), "1".to_string(),
                 "-temporal-aq".to_string(), "1".to_string(),
-                "-c:a".to_string(), "aac".to_string(),
-                "-b:a".to_string(), "320k".to_string(),
                 "-movflags".to_string(), "+faststart".to_string(),
-            ]
+            ];
+            if any_has_audio {
+                v.extend([
+                    "-c:a".to_string(), "aac".to_string(),
+                    "-b:a".to_string(), "320k".to_string(),
+                ]);
+            }
+            v
         }
         "h264-cpu" => {
             let crf = clamp_quality(quality_value, 14, 28, 18);
-            vec![
+            let mut v = vec![
                 "-c:v".to_string(), "libx264".to_string(),
                 "-preset".to_string(), "slow".to_string(),
                 "-crf".to_string(), crf.to_string(),
-                "-c:a".to_string(), "aac".to_string(),
-                "-b:a".to_string(), "320k".to_string(),
                 "-movflags".to_string(), "+faststart".to_string(),
-            ]
+            ];
+            if any_has_audio {
+                v.extend([
+                    "-c:a".to_string(), "aac".to_string(),
+                    "-b:a".to_string(), "320k".to_string(),
+                ]);
+            }
+            v
         }
         "hevc-cpu" => {
             let crf = clamp_quality(quality_value, 14, 28, 18);
-            vec![
+            let mut v = vec![
                 "-c:v".to_string(), "libx265".to_string(),
                 "-tag:v".to_string(), "hvc1".to_string(),
                 "-preset".to_string(), "slow".to_string(),
                 "-crf".to_string(), crf.to_string(),
-                "-c:a".to_string(), "aac".to_string(),
-                "-b:a".to_string(), "320k".to_string(),
                 "-movflags".to_string(), "+faststart".to_string(),
-            ]
+            ];
+            if any_has_audio {
+                v.extend([
+                    "-c:a".to_string(), "aac".to_string(),
+                    "-b:a".to_string(), "320k".to_string(),
+                ]);
+            }
+            v
         }
         _ => unreachable!(),
     };
@@ -607,8 +672,14 @@ fn run_clip_export_merged(
                 "-preset".to_string(), "slow".to_string(),
                 "-crf".to_string(), crf.to_string(),
                 "-pix_fmt".to_string(), "yuv420p".to_string(),
-                "-c:a".to_string(), "aac".to_string(),
-                "-b:a".to_string(), "320k".to_string(),
+            ]);
+            if any_has_audio {
+                fallback_args.extend([
+                    "-c:a".to_string(), "aac".to_string(),
+                    "-b:a".to_string(), "320k".to_string(),
+                ]);
+            }
+            fallback_args.extend([
                 "-progress".to_string(), "pipe:1".to_string(),
                 "-stats_period".to_string(), "0.5".to_string(),
                 output.to_string_lossy().to_string(),
@@ -1701,3 +1772,249 @@ pub(crate) async fn cancel_clip(window: tauri::Window) {
         }
     }
 }
+
+#[tauri::command]
+pub(crate) async fn clip_preview_merge(
+    window: tauri::Window,
+    clips: Vec<ExportClip>,
+) -> Result<String, String> {
+    if clips.len() < 2 {
+        return Err("Merge requires at least 2 clips".to_string());
+    }
+    log_info(
+        "clip.preview_merge.start",
+        "Starting real-time preview merge",
+        json!({ "clipCount": clips.len() }),
+    );
+    let log_clip_count = clips.len();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        run_clip_preview_merge(window, clips)
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    match &result {
+        Ok(payload) => log_info(
+            "clip.preview_merge.complete",
+            "Real-time preview merge completed",
+            json!({ "clipCount": log_clip_count, "result": payload }),
+        ),
+        Err(error) => log_error(
+            "clip.preview_merge.error",
+            "Real-time preview merge failed",
+            json!({ "clipCount": log_clip_count, "error": error }),
+        ),
+    }
+    result
+}
+
+fn run_clip_preview_merge(
+    window: tauri::Window,
+    clips: Vec<ExportClip>,
+) -> Result<String, String> {
+    let root = app_root()?;
+    let ffmpeg = find_tool(&root, "ffmpeg");
+    let ffprobe = find_tool(&root, "ffprobe");
+    ensure_tool(&ffmpeg)?;
+    ensure_tool(&ffprobe)?;
+
+    let app_data_dir = window
+        .app_handle()
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Could not get app data directory: {error}"))?;
+
+    // Create unique key based on the clips to be merged
+    let mut hash_input = String::new();
+    for clip in &clips {
+        hash_input.push_str(&clip.source);
+        hash_input.push_str(&format!(":{:.3}:{:.3}", clip.start, clip.end));
+    }
+    let range_key = short_stable_id(&[&hash_input, "preview-merge-v1"]);
+    
+    // Save under scene_clips so it uses same permissions/location as other preview clips
+    let cache_dir = app_data_dir.join("scene_clips").join("merged");
+    fs::create_dir_all(&cache_dir)
+        .map_err(|error| format!("Could not create preview merge cache folder: {error}"))?;
+
+    let output = cache_dir.join(format!("{range_key}.mp4"));
+    let temp_output = output.with_extension("tmp.mp4");
+
+    // Check if target output already exists and has non-trivial size
+    if output.metadata().map(|m| m.len() > 1024).unwrap_or(false) {
+        let mut total_duration = 0.0_f64;
+        for clip in &clips {
+            let fps = clip.fps.filter(|f| *f > 0.0).unwrap_or(24.0);
+            let offset = 1.5 / fps;
+            let start = clip.start + offset;
+            let raw_duration = (clip.end - start).max(0.0);
+            let duration = if raw_duration > 0.05 { raw_duration - 0.015 } else { raw_duration };
+            total_duration += duration;
+        }
+        return serialize_clip_preview_done("merged-preview".to_string(), output, total_duration, true);
+    }
+
+    // Deduplicate inputs (exact same code as run_clip_export_merged)
+    let mut input_paths: Vec<PathBuf> = Vec::new();
+    let mut input_index_for_clip: Vec<usize> = Vec::with_capacity(clips.len());
+    for clip in clips.iter() {
+        let canonical = canonical_input_path(&clip.source)?;
+        let idx = match input_paths.iter().position(|p| p == &canonical) {
+            Some(i) => i,
+            None => {
+                input_paths.push(canonical);
+                input_paths.len() - 1
+            }
+        };
+        input_index_for_clip.push(idx);
+    }
+
+    // Probe which inputs actually have audio streams
+    let mut input_has_audio: Vec<bool> = Vec::with_capacity(input_paths.len());
+    for path in &input_paths {
+        let has_audio = probe_has_audio_stream(&ffprobe, path).unwrap_or(false);
+        input_has_audio.push(has_audio);
+    }
+    let any_has_audio = input_has_audio.iter().any(|&h| h);
+
+    let mut args: Vec<String> = vec![
+        "-y".to_string(),
+        "-hide_banner".to_string(),
+        "-nostdin".to_string(),
+        "-loglevel".to_string(),
+        "error".to_string(),
+    ];
+    for path in &input_paths {
+        args.push("-i".to_string());
+        args.push(path.to_string_lossy().to_string());
+    }
+
+    let mut filter_parts: Vec<String> = Vec::new();
+    let mut concat_inputs = String::new();
+    let mut total_duration = 0.0_f64;
+    for (i, clip) in clips.iter().enumerate() {
+        let input_idx = input_index_for_clip[i];
+        let fps = clip.fps.filter(|f| *f > 0.0).unwrap_or(24.0);
+        let offset = 1.5 / fps;
+        let start = clip.start + offset;
+        let raw_duration = (clip.end - start).max(0.0);
+        let duration = if raw_duration > 0.05 { raw_duration - 0.015 } else { raw_duration };
+        total_duration += duration;
+        filter_parts.push(format!(
+            "[{input_idx}:v]trim=start={start:.3}:duration={duration:.3},setpts=PTS-STARTPTS[v{i}]"
+        ));
+        if any_has_audio {
+            let clip_has_audio = input_has_audio[input_idx];
+            if clip_has_audio {
+                filter_parts.push(format!(
+                    "[{input_idx}:a]atrim=start={start:.3}:duration={duration:.3},asetpts=PTS-STARTPTS[a{i}]"
+                ));
+            } else {
+                filter_parts.push(format!(
+                    "anullsrc=channel_layout=stereo:sample_rate=44100,atrim=duration={duration:.3},asetpts=PTS-STARTPTS[a{i}]"
+                ));
+            }
+            concat_inputs.push_str(&format!("[v{i}][a{i}]"));
+        } else {
+            concat_inputs.push_str(&format!("[v{i}]"));
+        }
+    }
+    let n = clips.len();
+    if any_has_audio {
+        filter_parts.push(format!(
+            "{concat_inputs}concat=n={n}:v=1:a=1[mergedv][mergeda]"
+        ));
+    } else {
+        filter_parts.push(format!(
+            "{concat_inputs}concat=n={n}:v=1:a=0[mergedv]"
+        ));
+    }
+    // Scale output to 720p maximum
+    filter_parts.push("[mergedv]scale=-2:'min(720,ih)'[outv]".to_string());
+
+    args.push("-filter_complex".to_string());
+    args.push(filter_parts.join(";"));
+    args.push("-map".to_string());
+    args.push("[outv]".to_string());
+    if any_has_audio {
+        args.push("-map".to_string());
+        args.push("[mergeda]".to_string());
+    }
+
+    // Check NVENC availability
+    let use_nvenc = *H264_NVENC_AVAILABLE
+        .get_or_init(|| ffmpeg_listing(&ffmpeg, "-encoders").contains("h264_nvenc"));
+
+    let encode_args: Vec<String> = if use_nvenc {
+        vec![
+            "-c:v".to_string(),
+            "h264_nvenc".to_string(),
+            "-preset".to_string(),
+            "p1".to_string(),
+            "-cq".to_string(),
+            "26".to_string(),
+            "-pix_fmt".to_string(),
+            "yuv420p".to_string(),
+        ]
+    } else {
+        vec![
+            "-c:v".to_string(),
+            "libx264".to_string(),
+            "-preset".to_string(),
+            "ultrafast".to_string(),
+            "-crf".to_string(),
+            "26".to_string(),
+            "-pix_fmt".to_string(),
+            "yuv420p".to_string(),
+        ]
+    };
+
+    let mut final_args = args.clone();
+    final_args.extend(encode_args);
+    if any_has_audio {
+        final_args.extend([
+            "-c:a".to_string(),
+            "aac".to_string(),
+            "-b:a".to_string(),
+            "128k".to_string(),
+            "-ac".to_string(),
+            "2".to_string(),
+        ]);
+    }
+    final_args.extend([
+        "-avoid_negative_ts".to_string(),
+        "make_zero".to_string(),
+        "-movflags".to_string(),
+        "+faststart".to_string(),
+        temp_output.to_string_lossy().to_string(),
+    ]);
+
+    let _ = fs::remove_file(&temp_output);
+    let result = cmd(&ffmpeg)
+        .args(final_args)
+        .output()
+        .map_err(|error| format!("Could not start ffmpeg for preview merge: {error}"))?;
+
+    if !result.status.success() {
+        let stderr = String::from_utf8_lossy(&result.stderr).trim().to_string();
+        let _ = fs::remove_file(&temp_output);
+        return Err(if stderr.is_empty() {
+            format!("FFmpeg exited with code {}", result.status.code().unwrap_or(-1))
+        } else {
+            stderr
+        });
+    }
+
+    if !temp_output.metadata().map(|m| m.len() > 1024).unwrap_or(false) {
+        let _ = fs::remove_file(&temp_output);
+        return Err("FFmpeg did not create a valid merged preview file.".to_string());
+    }
+
+    if output.exists() {
+        let _ = fs::remove_file(&output);
+    }
+    fs::rename(&temp_output, &output)
+        .map_err(|error| format!("Could not finalize merged preview: {error}"))?;
+
+    serialize_clip_preview_done("merged-preview".to_string(), output, total_duration, false)
+}
+

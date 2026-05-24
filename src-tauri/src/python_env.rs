@@ -22,6 +22,17 @@ use crate::{log_error, log_info, truncate_log_text};
 pub(crate) static TOOLS_DIR_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
 
 pub(crate) fn app_root() -> Result<PathBuf, String> {
+    let cwd = std::env::current_dir().map_err(|error| error.to_string())?;
+    if cwd.file_name().and_then(|name| name.to_str()) == Some("src-tauri") {
+        return cwd
+            .parent()
+            .map(Path::to_path_buf)
+            .ok_or_else(|| "Could not resolve project root".to_string());
+    }
+    if cwd.join("backend").is_dir() && cwd.join("python").is_dir() {
+        return Ok(cwd);
+    }
+
     if let Some(exe_dir) = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(Path::to_path_buf))
@@ -29,13 +40,6 @@ pub(crate) fn app_root() -> Result<PathBuf, String> {
         if exe_dir.join("backend").is_dir() {
             return Ok(exe_dir);
         }
-    }
-    let cwd = std::env::current_dir().map_err(|error| error.to_string())?;
-    if cwd.file_name().and_then(|name| name.to_str()) == Some("src-tauri") {
-        return cwd
-            .parent()
-            .map(Path::to_path_buf)
-            .ok_or_else(|| "Could not resolve project root".to_string());
     }
     Ok(cwd)
 }

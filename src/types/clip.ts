@@ -20,6 +20,14 @@ export type ClipPreviewItem = {
   previewState?: ClipPreviewState;
   fps: number;
   path?: string;
+  isUnified?: boolean;
+  segments?: Array<{
+    source: string;
+    start: number;
+    end: number;
+    index: number;
+    fps: number;
+  }>;
 };
 
 export type ClipPreviewBatchResult = {

@@ -91,12 +91,12 @@ export function AppearanceSettings({
 
         <div className="setting-row theme-setting-row">
           <div className="setting-info">
-            <span className="setting-label">Gradient theme</span>
+            <span className="setting-label">Theme colors</span>
             <span className="setting-desc">
-              Choose one or two custom colors for buttons, active tabs, highlights, progress, and action states.
+              Choose one or two colors for buttons, active tabs, highlights, loading progress, and clickable items.
             </span>
           </div>
-          <div className="theme-customizer" aria-label="Gradient theme colors">
+          <div className="theme-customizer" aria-label="Theme colors">
             <label className="theme-color-field">
               <span>Color 1</span>
               <input
@@ -110,7 +110,7 @@ export function AppearanceSettings({
                   scheduleFlush("theme_color_a");
                 }}
                 onBlur={flushPending}
-                aria-label="Gradient theme color 1"
+                aria-label="Theme color 1"
               />
             </label>
             <label className="theme-color-field">
@@ -126,7 +126,7 @@ export function AppearanceSettings({
                   scheduleFlush("theme_color_b");
                 }}
                 onBlur={flushPending}
-                aria-label="Gradient theme color 2"
+                aria-label="Theme color 2"
               />
             </label>
             <div
@@ -144,15 +144,15 @@ export function AppearanceSettings({
             <span className="setting-label">Background image</span>
             <span className="setting-desc">
               {backendConfig?.background_image
-                ? "An image is currently set. Open the customizer to reposition, dim, blur, or remove it."
-                : "Replace the empty black areas of the workspace with a custom image. Opens a cropper for positioning, zoom, dim, and blur."}
+                ? "You have a background image. Open the settings to move, darken, blur, or remove it."
+                : "Add a custom image to the background of your workspace. Opens an editor to crop, move, zoom, darken, or blur your image."}
             </span>
           </div>
           <button
             type="button"
             className="settings-action-pill spring-motion"
             onClick={() => window.dispatchEvent(new CustomEvent("bg-customize-open"))}
-            title={backendConfig?.background_image ? "Open the background customizer" : "Choose a background image"}
+            title={backendConfig?.background_image ? "Open background settings" : "Choose a background image"}
           >
             {backendConfig?.background_image ? (
               <span
@@ -166,7 +166,7 @@ export function AppearanceSettings({
               </span>
             )}
             <span className="settings-action-pill-label">
-              {backendConfig?.background_image ? "Customize background" : "Choose background"}
+              {backendConfig?.background_image ? "Edit background" : "Choose background"}
             </span>
           </button>
         </div>
@@ -176,9 +176,9 @@ export function AppearanceSettings({
         <div className="settings-group-header">Community</div>
         <div className="setting-row">
           <div className="setting-info">
-            <span className="setting-label">Join the Discord</span>
+            <span className="setting-label">Join our Discord</span>
             <span className="setting-desc">
-              Chat with other creators, share AMVs, request features, and get help when something breaks.
+              Chat with other users, share your videos, request new features, and get help when something goes wrong.
             </span>
           </div>
           <button
@@ -201,13 +201,13 @@ export function AppearanceSettings({
         </div>
       </div>
 
-      <div className="settings-group glass">
-        <div className="settings-group-header">Discord Rich Presence</div>
+        <div className="settings-group glass">
+        <div className="settings-group-header">Discord Status</div>
         <div className="setting-row">
           <div className="setting-info">
-            <span className="setting-label">Show activity on Discord</span>
+            <span className="setting-label">Show status on Discord</span>
             <span className="setting-desc">
-              Displays &ldquo;Playing Ultimate AMV&rdquo; with the current panel or running job on your Discord profile. Requires the Discord desktop app to be running.
+              Shows &ldquo;Playing Ultimate AMV&rdquo; and what you are doing on your Discord profile. Requires the Discord desktop app to be open.
             </span>
           </div>
           <div className="settings-toggle-wrap">
@@ -222,10 +222,10 @@ export function AppearanceSettings({
               className="settings-toggle-switch spring-motion"
               role="switch"
               aria-checked={discordEnabled}
-              aria-label="Show activity on Discord"
+              aria-label="Show status on Discord"
               data-on={discordEnabled ? "true" : "false"}
               onClick={toggleDiscordPresence}
-              title={discordEnabled ? "Click to hide presence on Discord" : "Click to show presence on Discord"}
+              title={discordEnabled ? "Click to hide status on Discord" : "Click to show status on Discord"}
             >
               <span className="settings-toggle-track" aria-hidden="true">
                 <span className="settings-toggle-track-on">ON</span>

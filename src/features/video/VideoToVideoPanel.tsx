@@ -196,7 +196,7 @@ export function VideoToVideoPanel() {
     setProgress({
       stage: "starting",
       percent: 0,
-      message: selectedFiles.length > 1 ? `Preparing ${selectedFiles.length} video transcodes...` : "Preparing ffmpeg transcode...",
+      message: selectedFiles.length > 1 ? `Preparing ${selectedFiles.length} video conversions...` : "Preparing conversion...",
     });
     try {
       const completed: BatchItemStatus[] = [];
@@ -227,18 +227,18 @@ export function VideoToVideoPanel() {
         setBatchItems([...completed]);
       }
       if (videoCancellingRef.current) {
-        setError("Video transcode cancelled.");
+        setError("Video conversion cancelled.");
         setProgress({
           stage: "cancelled",
           percent: null,
-          message: "Video transcode cancelled.",
+          message: "Video conversion cancelled.",
         });
         return;
       }
       setProgress({
         stage: "complete",
         percent: 100,
-        message: `Transcoded ${completed.filter((item) => item.status === "done").length}/${selectedFiles.length} files.`,
+        message: `Converted ${completed.filter((item) => item.status === "done").length}/${selectedFiles.length} files.`,
       });
     } catch (conversionError) {
       setError(readBridgeError(conversionError));
@@ -265,13 +265,13 @@ export function VideoToVideoPanel() {
     >
       <div className="drop-zone-overlay">
         <Upload size={32} strokeWidth={1.8} />
-        <span>Drop video to transcode</span>
+        <span>Drop video to convert</span>
         <small>MP4 · MKV · MOV · WEBM · AVI · M4V</small>
       </div>
       <div className="conversion-hero">
         <div>
-          <span className="conversion-kicker">Video To Video</span>
-          <h2>Transcode footage for editing</h2>
+          <span className="conversion-kicker">Video Conversion</span>
+          <h2>Convert footage for editing</h2>
         </div>
         <div className="conversion-format-card wide">
           {gpuStatus && (

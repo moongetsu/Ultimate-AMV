@@ -1,6 +1,5 @@
 use std::{
     io::{BufRead, BufReader},
-    path::{Path, PathBuf},
     process::Stdio,
     thread,
 };
@@ -25,6 +24,131 @@ pub(crate) async fn bgremove_status() -> Result<String, String> {
 pub(crate) async fn cancel_bgremove() {
     log_info("bgremove.cancel", "Cancelling active background removal", Value::Null);
     kill_child_pid(&BGREMOVE_CHILD_PID);
+}
+
+/// Fast-path for image downloads: copies the already-cached preview result to
+/// the user's chosen destination instead of re-running the full AI pipeline.
+#[tauri::command]
+pub(crate) async fn bgremove_save_preview(
+    source_path: String,
+    destination_path: String,
+) -> Result<String, String> {
+    log_info(
+        "bgremove.save_preview.start",
+        "Saving cached preview to user destination",
+        json!({
+            "source": &source_path,
+            "destination": &destination_path,
+        }),
+    );
+
+    let source = std::path::PathBuf::from(&source_path);
+    let destination = std::path::PathBuf::from(&destination_path);
+
+    if !source.exists() {
+        return Err(format!(
+            "Cached preview file not found: {}",
+            source.display()
+        ));
+    }
+
+    // Ensure destination parent directory exists
+    if let Some(parent) = destination.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| {
+            format!("Could not create destination directory: {error}")
+        })?;
+    }
+
+    let started = std::time::Instant::now();
+    std::fs::copy(&source, &destination).map_err(|error| {
+        log_error(
+            "bgremove.save_preview.error",
+            "Could not copy cached preview",
+            json!({ "source": &source_path, "destination": &destination_path, "error": error.to_string() }),
+        );
+        format!("Could not save isolated image: {error}")
+    })?;
+    let elapsed = started.elapsed().as_secs_f64();
+
+    let payload = serde_json::json!({
+        "type": "done",
+        "input": &source_path,
+        "output": &destination_path,
+        "frames": 1,
+        "elapsedSeconds": (elapsed * 100.0).round() / 100.0,
+    })
+    .to_string();
+
+    log_info(
+        "bgremove.save_preview.complete",
+        "Cached preview saved successfully",
+        json!({ "source": &source_path, "destination": &destination_path, "elapsed": elapsed }),
+    );
+
+    Ok(payload)
+}
+
+#[tauri::command]
+pub(crate) async fn bgremove_preview(
+    window: tauri::Window,
+    input_path: String,
+    model: String,
+    cpu: bool,
+) -> Result<String, String> {
+    log_info(
+        "bgremove.preview.invoke.start",
+        "Starting background removal single-frame preview",
+        json!({
+            "input": &input_path,
+            "model": &model,
+            "cpu": cpu
+        }),
+    );
+
+    let root = app_root()?;
+    let preview_dir = root.join("cache").join("bgremove_previews");
+    std::fs::create_dir_all(&preview_dir).map_err(|error| {
+        format!("Could not create preview cache directory: {error}")
+    })?;
+
+    let args = vec![
+        "preview".to_string(),
+        "--input".to_string(),
+        input_path.clone(),
+        "--output-dir".to_string(),
+        preview_dir.to_string_lossy().to_string(),
+        "--model".to_string(),
+        model,
+    ];
+    
+    let mut final_args = args;
+    if cpu {
+        final_args.push("--cpu".to_string());
+    }
+
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        run_streaming_bgremove_cli(
+            window,
+            final_args,
+            "bgremove-progress",
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+
+    match &result {
+        Ok(payload) => log_info(
+            "bgremove.preview.invoke.complete",
+            "Background removal preview completed successfully",
+            json!({ "input": input_path, "result": payload }),
+        ),
+        Err(error) => log_error(
+            "bgremove.preview.invoke.error",
+            "Background removal preview failed",
+            json!({ "input": input_path, "error": error }),
+        ),
+    }
+    result
 }
 
 #[tauri::command]
@@ -158,7 +282,7 @@ pub(crate) fn run_streaming_bgremove_cli(
                 Some("progress") | Some("dependencies") | Some("processing") | Some("model-init") => {
                     let _ = window.emit(progress_event, value);
                 }
-                Some("done") | Some("error") => {
+                Some("done") | Some("preview_done") | Some("error") => {
                     final_payload = Some(line);
                 }
                 _ => {}

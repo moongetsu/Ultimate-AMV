@@ -39,7 +39,7 @@ const primaryItems: NavItem[] = [
   { id: "audio-extraction", label: "Vocal Separation", short: "Vocals", icon: AudioLines },
   { id: "clip-hunting", label: "Scene Splitter", short: "Splitter", icon: Compass },
   { id: "downloader", label: "Downloader", short: "Download", icon: Download },
-  { id: "bg-removal", label: "Background Removal", short: "Matting", icon: Sparkles },
+  { id: "bg-removal", label: "BG Remover", short: "Matting", icon: Sparkles },
   { id: "audio-conversion", label: "Audio Conversion", short: "Audio", icon: Music2 },
   { id: "video-conversion", label: "Video Conversion", short: "Video", icon: Film },
 ];
@@ -72,7 +72,7 @@ const panelMeta: Record<SectionId, { kicker: string; title: string; stats: strin
   },
   "bg-removal": {
     kicker: "Isolation",
-    title: "Background Removal",
+    title: "BG Remover",
     stats: ["SkyTNT", "Alpha", "Fast GPU"],
   },
   settings: {
@@ -91,6 +91,7 @@ export function App() {
   const [expanded, setExpanded] = React.useState(true);
   const [active, setActive] = React.useState<SectionId>("clip-hunting");
   const [downloaderTab, setDownloaderTab] = React.useState<DownloaderTab>("anime");
+  const [bgRemoveTab, setBgRemoveTab] = React.useState<"video" | "image">("video");
   const [bgState, setBgState] = React.useState<BackgroundState>(DEFAULT_BG_STATE);
   const [bgPreview, setBgPreview] = React.useState<BackgroundState | null>(null);
   const [bgModalOpen, setBgModalOpen] = React.useState(false);
@@ -129,7 +130,7 @@ export function App() {
     // Fire-and-forget ffmpeg warmup so the first scene preview click in the
     // session doesn't pay a ~1-2s cold-start tax (DLL loads + NVENC probe).
     // Runs in both clip modes - CPU users hit scene_clip_render too.
-    void invoke("warmup_ffmpeg").catch(() => {});
+    void invoke("warmup_ffmpeg").catch(() => { });
 
     invoke<string>("get_config")
       .then((raw) => {
@@ -166,24 +167,27 @@ export function App() {
   const modeTabs = isAudioExtraction
     ? ([{ id: "extract", label: "Extract" }] as const)
     : isBgRemoval
-      ? ([{ id: "bgremove", label: "Isolate" }] as const)
-    : isLogs
-      ? ([{ id: "logs", label: "Logs" }] as const)
-      : isSettings
-        ? ([{ id: "general", label: "General" }] as const)
-        : isDownloader
-          ? ([
-            { id: "anime", label: "Anime Download" },
-            { id: "youtube", label: "YouTube Download" },
-          ] as const)
-          : isClipHunting
-            ? ([{ id: "extractor", label: "Scene splitter" }] as const)
-          : isAudioConversion || isVideoConversion
-            ? ([{ id: "convert", label: "Convert" }] as const)
-            : ([
-              { id: "media", label: "Media browser" },
-              { id: "clip", label: "Scene splitting" },
-            ] as const);
+      ? ([
+        { id: "video", label: "Video Isolate" },
+        { id: "image", label: "Image Isolate" },
+      ] as const)
+      : isLogs
+        ? ([{ id: "logs", label: "Logs" }] as const)
+        : isSettings
+          ? ([{ id: "general", label: "General" }] as const)
+          : isDownloader
+            ? ([
+              { id: "anime", label: "Anime Download" },
+              { id: "youtube", label: "YouTube Download" },
+            ] as const)
+            : isClipHunting
+              ? ([{ id: "extractor", label: "Scene splitter" }] as const)
+              : isAudioConversion || isVideoConversion
+                ? ([{ id: "convert", label: "Convert" }] as const)
+                : ([
+                  { id: "media", label: "Media browser" },
+                  { id: "clip", label: "Scene splitting" },
+                ] as const);
 
   return (
     <main className="desktop">
@@ -271,22 +275,28 @@ export function App() {
                       key={tab.id}
                       type="button"
                       className={`mode-tab spring-motion ${isAudioExtraction
-                          ? "is-active"
-                          : isDownloader
-                            ? downloaderTab === tab.id
+                        ? "is-active"
+                        : isDownloader
+                          ? downloaderTab === tab.id
+                            ? "is-active"
+                            : ""
+                          : isBgRemoval
+                            ? bgRemoveTab === tab.id
                               ? "is-active"
                               : ""
                             : isClipHunting
                               ? "is-active"
                               : isAudioConversion || isVideoConversion
-                              ? "is-active"
-                              : tab.id === "media" || tab.id === "logs" || tab.id === "general"
                                 ? "is-active"
-                                : ""
+                                : tab.id === "media" || tab.id === "logs" || tab.id === "general"
+                                  ? "is-active"
+                                  : ""
                         }`}
                       onClick={() => {
                         if (isDownloader && (tab.id === "anime" || tab.id === "youtube")) {
                           setDownloaderTab(tab.id);
+                        } else if (isBgRemoval && (tab.id === "video" || tab.id === "image")) {
+                          setBgRemoveTab(tab.id);
                         }
                       }}
                     >
@@ -306,7 +316,7 @@ export function App() {
                   <AudioExtractionPanel />
                 </div>
                 <div className={`panel-view spring-motion ${isBgRemoval ? "is-active" : "is-hidden"}`} aria-hidden={!isBgRemoval}>
-                  <BgRemovePanel />
+                  <BgRemovePanel activeTab={bgRemoveTab} />
                 </div>
                 {!isClipHunting && !isDownloader && !isAudioExtraction && !isBgRemoval && (
                   <div className="panel-view is-active spring-motion">

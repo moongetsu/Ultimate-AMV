@@ -122,6 +122,14 @@ vi.mock('@tauri-apps/api/event', () => ({
   emit: mockEmitFn,
 }))
 
+export const mockOnDragDropEvent = vi.fn(() => () => {})
+
+vi.mock('@tauri-apps/api/webview', () => ({
+  getCurrentWebview: () => ({
+    onDragDropEvent: mockOnDragDropEvent,
+  }),
+}))
+
 // ---------------------------------------------------------------------------
 // Auto-reset in beforeEach (called from tests/setup/index.ts)
 // ---------------------------------------------------------------------------

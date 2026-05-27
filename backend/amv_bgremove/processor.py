@@ -162,3 +162,45 @@ def remove_background_video(
                 raise RuntimeError(f"FFmpeg transparent WebM encoding failed:\n{err_msg}")
                 
     return frame_idx
+
+def extract_single_frame(video_path: str, output_path: str, frame_index: int):
+    """
+    Extracts a single frame from the video at frame_index and saves it as an image.
+    Uses cv2 for absolute precision and speed.
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise RuntimeError(f"Could not open input video file: {video_path}")
+        
+    try:
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if total_frames > 0:
+            frame_index = min(max(0, frame_index), total_frames - 1)
+            
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
+        ret, frame = cap.read()
+        if not ret:
+            # Fallback to frame 0 if reading at index failed
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = cap.read()
+            if not ret:
+                raise RuntimeError(f"Could not read frame at index {frame_index} from: {video_path}")
+                
+        # Save as PNG
+        cv2.imwrite(output_path, frame)
+    finally:
+        cap.release()
+
+def remove_background_frame(
+    input_image_path: str,
+    output_image_path: str,
+    model_key: str,
+    force_cpu: bool = False
+):
+    """
+    Runs background removal on a single image frame using the selected model.
+    """
+    session = create_session(model_key, force_cpu=force_cpu)
+    img = Image.open(input_image_path)
+    out_img = remove(img, session=session)
+    out_img.save(output_image_path, "PNG")

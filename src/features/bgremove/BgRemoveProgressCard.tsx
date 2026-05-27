@@ -1,8 +1,8 @@
 import React from "react";
-import { Loader2, Video, X } from "lucide-react";
+import { Loader2, Video, X, Image } from "lucide-react";
 import type { BgRemoveProgress } from "../../types/bgremove";
 
-function getStageHeading(stage: string, percent: number): string {
+function getStageHeading(stage: string, percent: number, isImage?: boolean): string {
   switch (stage) {
     case "dependencies":
       return "Checking dependencies...";
@@ -11,7 +11,7 @@ function getStageHeading(stage: string, percent: number): string {
     case "processing":
       return percent >= 0 ? `Isolating character : ${Math.round(percent)}%` : "Isolating background...";
     default:
-      return "Processing video...";
+      return isImage ? "Processing image..." : "Processing video...";
   }
 }
 
@@ -19,15 +19,17 @@ export function BgRemoveProgressCard({
   fileName: name,
   progress,
   onCancel,
+  isImage,
 }: {
   fileName: string;
   progress: BgRemoveProgress | null;
   onCancel?: () => void;
+  isImage?: boolean;
 }) {
   const stage = progress?.stage ?? "dependencies";
   const percent = progress?.percent ?? -1;
   const indeterminate = percent < 0;
-  const stageLabel = getStageHeading(stage, percent);
+  const stageLabel = getStageHeading(stage, percent, isImage);
   const subline = progress?.message ?? "Preparing process...";
 
   return (
@@ -39,7 +41,7 @@ export function BgRemoveProgressCard({
         <div>
           <h2>{stageLabel}</h2>
           <p className="audio-file-line">
-            <Video size={14} strokeWidth={2} /> {name}
+            {isImage ? <Image size={14} strokeWidth={2} /> : <Video size={14} strokeWidth={2} />} {name}
           </p>
         </div>
       </header>

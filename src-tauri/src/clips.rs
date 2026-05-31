@@ -164,8 +164,14 @@ fn run_clip_export(
                     "main10".to_string(),
                     "-highbitdepth".to_string(),
                     "1".to_string(),
+                    // Re-encode to AAC so we can force stereo downmix.
+                    // -c:a copy cannot change channel layout.
                     "-c:a".to_string(),
-                    "copy".to_string(),
+                    "aac".to_string(),
+                    "-b:a".to_string(),
+                    "320k".to_string(),
+                    "-ac".to_string(),
+                    "2".to_string(),
                 ]);
                 format!("Encoding GPU Intra clip {}/{}", i + 1, clips.len())
             }
@@ -186,6 +192,9 @@ fn run_clip_export(
                     "yuv422p10le".to_string(),
                     "-c:a".to_string(),
                     "pcm_s16le".to_string(),
+                    // Downmix multi-channel audio (5.1, 7.1, etc.) to stereo.
+                    "-ac".to_string(),
+                    "2".to_string(),
                 ]);
                 format!("Encoding ProRes clip {}/{}", i + 1, clips.len())
             }
@@ -209,6 +218,8 @@ fn run_clip_export(
                     "aac".to_string(),
                     "-b:a".to_string(),
                     "320k".to_string(),
+                    "-ac".to_string(),
+                    "2".to_string(),
                     "-movflags".to_string(),
                     "+faststart".to_string(),
                 ]);
@@ -234,6 +245,8 @@ fn run_clip_export(
                     "aac".to_string(),
                     "-b:a".to_string(),
                     "320k".to_string(),
+                    "-ac".to_string(),
+                    "2".to_string(),
                     "-movflags".to_string(),
                     "+faststart".to_string(),
                 ]);
@@ -253,6 +266,8 @@ fn run_clip_export(
                     "aac".to_string(),
                     "-b:a".to_string(),
                     "320k".to_string(),
+                    "-ac".to_string(),
+                    "2".to_string(),
                     "-movflags".to_string(),
                     "+faststart".to_string(),
                 ]);
@@ -274,6 +289,8 @@ fn run_clip_export(
                     "aac".to_string(),
                     "-b:a".to_string(),
                     "320k".to_string(),
+                    "-ac".to_string(),
+                    "2".to_string(),
                     "-movflags".to_string(),
                     "+faststart".to_string(),
                 ]);
@@ -485,8 +502,11 @@ fn run_clip_export_merged(
         if any_has_audio {
             let clip_has_audio = input_has_audio[input_idx];
             if clip_has_audio {
+                // aformat=channel_layouts=stereo downmixes multi-channel sources
+                // (5.1, 7.1, etc.) before the concat so all segments share the
+                // same channel layout, which is required by the concat filter.
                 filter_parts.push(format!(
-                    "[{input_idx}:a]atrim=start={start:.3}:duration={duration:.3},asetpts=PTS-STARTPTS[a{i}]"
+                    "[{input_idx}:a]atrim=start={start:.3}:duration={duration:.3},asetpts=PTS-STARTPTS,aformat=channel_layouts=stereo[a{i}]"
                 ));
             } else {
                 filter_parts.push(format!(
@@ -531,9 +551,12 @@ fn run_clip_export_merged(
                 "-highbitdepth".to_string(), "1".to_string(),
             ];
             if any_has_audio {
+                // aformat in the filter chain already downmixed to stereo;
+                // -ac 2 here is a safety net in case the filter didn't run.
                 v.extend([
                     "-c:a".to_string(), "aac".to_string(),
                     "-b:a".to_string(), "320k".to_string(),
+                    "-ac".to_string(), "2".to_string(),
                 ]);
             }
             v
@@ -548,6 +571,7 @@ fn run_clip_export_merged(
             if any_has_audio {
                 v.extend([
                     "-c:a".to_string(), "pcm_s16le".to_string(),
+                    "-ac".to_string(), "2".to_string(),
                 ]);
             }
             v
@@ -567,6 +591,7 @@ fn run_clip_export_merged(
                 v.extend([
                     "-c:a".to_string(), "aac".to_string(),
                     "-b:a".to_string(), "320k".to_string(),
+                    "-ac".to_string(), "2".to_string(),
                 ]);
             }
             v
@@ -586,6 +611,7 @@ fn run_clip_export_merged(
                 v.extend([
                     "-c:a".to_string(), "aac".to_string(),
                     "-b:a".to_string(), "320k".to_string(),
+                    "-ac".to_string(), "2".to_string(),
                 ]);
             }
             v
@@ -602,6 +628,7 @@ fn run_clip_export_merged(
                 v.extend([
                     "-c:a".to_string(), "aac".to_string(),
                     "-b:a".to_string(), "320k".to_string(),
+                    "-ac".to_string(), "2".to_string(),
                 ]);
             }
             v
@@ -619,6 +646,7 @@ fn run_clip_export_merged(
                 v.extend([
                     "-c:a".to_string(), "aac".to_string(),
                     "-b:a".to_string(), "320k".to_string(),
+                    "-ac".to_string(), "2".to_string(),
                 ]);
             }
             v

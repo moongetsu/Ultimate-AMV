@@ -1,0 +1,544 @@
+/* ============================================================
+   SCENEPACKS PANEL
+   ============================================================ */
+
+.scenepacks-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 18px 18px;
+  gap: 14px;
+}
+
+.scenepacks-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scenepacks-panel-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.scenepacks-subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.scenepacks-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 24px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.scenepacks-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  gap: 12px;
+  color: var(--text-secondary);
+}
+
+.scenepacks-empty-state svg {
+  opacity: 0.4;
+}
+
+.scenepacks-empty-state h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.scenepacks-empty-state p {
+  margin: 0;
+  font-size: 12px;
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+/* Grid of pack cards */
+.scenepacks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.scenepacks-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scenepacks-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.scenepacks-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scenepacks-card-header h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scenepacks-card-delete {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.scenepacks-card:hover .scenepacks-card-delete {
+  opacity: 1;
+}
+
+.scenepacks-card-delete:hover {
+  color: var(--color-danger, #ef4444);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.scenepacks-card-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scenepacks-tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+}
+
+.scenepacks-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.scenepacks-card-footer span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Action buttons */
+.scenepacks-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.scenepacks-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.scenepacks-action-btn.is-primary {
+  background: var(--accent-primary, #3b82f6);
+  color: #fff;
+  border-color: var(--accent-primary, #3b82f6);
+}
+
+.scenepacks-action-btn.is-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.scenepacks-action-btn.is-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.scenepacks-action-btn.is-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.scenepacks-action-btn.is-danger {
+  background: transparent;
+  color: var(--color-danger, #ef4444);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.scenepacks-action-btn.is-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* Back button */
+.scenepacks-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.scenepacks-back-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Detail view */
+.scenepacks-detail {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 18px 18px;
+  gap: 12px;
+}
+
+.scenepacks-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.scenepacks-detail-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.scenepacks-detail-info h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.scenepacks-meta {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 4px 8px 0 0;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.scenepacks-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.scenepacks-format-select {
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.scenepacks-format-select:focus {
+  outline: none;
+  border-color: var(--accent-primary, #3b82f6);
+}
+
+.scenepacks-detail-stats {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.scenepacks-detail-stats span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scenepacks-select-all {
+  padding-bottom: 4px;
+}
+
+.scenepacks-select-all-btn {
+  font-size: 11px;
+  color: var(--accent-primary, #3b82f6);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.scenepacks-select-all-btn:hover {
+  text-decoration: underline;
+}
+
+/* Clip list */
+.scenepacks-clip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.scenepacks-clip-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.scenepacks-clip-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.scenepacks-clip-card.is-selected {
+  border-color: var(--accent-primary, #3b82f6);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.scenepacks-clip-check {
+  flex-shrink: 0;
+}
+
+.scenepacks-clip-check input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--accent-primary, #3b82f6);
+}
+
+.scenepacks-clip-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scenepacks-clip-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.scenepacks-clip-range {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono, "JetBrains Mono", "Cascadia Code", monospace);
+}
+
+.scenepacks-clip-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.scenepacks-empty {
+  text-align: center;
+  padding: 32px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* Create form */
+.scenepacks-create {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 18px 18px;
+  gap: 14px;
+}
+
+.scenepacks-create-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scenepacks-create-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.scenepacks-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+}
+
+.scenepacks-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scenepacks-field label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.scenepacks-field input {
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.scenepacks-field input:focus {
+  border-color: var(--accent-primary, #3b82f6);
+}
+
+.scenepacks-field input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.scenepacks-create-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+/* Save modal (triggered from ClipExtractorPanel) */
+.scenepacks-save-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scenepacks-save-modal {
+  background: var(--surface-primary, #1a1a2e);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 20px 24px;
+  width: 420px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.scenepacks-save-modal h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.scenepacks-save-modal-clip-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.scenepacks-save-modal-packs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.scenepacks-save-modal-pack-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.scenepacks-save-modal-pack-option:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.scenepacks-save-modal-pack-option.is-active {
+  border-color: var(--accent-primary, #3b82f6);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.scenepacks-save-modal-pack-option span {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.scenepacks-save-modal-pack-option small {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.scenepacks-save-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

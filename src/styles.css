@@ -31,6 +31,7 @@
 @import "./styles/new-audio.css" layer(base);
 @import "./styles/modals.css" layer(base);
 @import "./styles/components.css" layer(base);
+@import "./styles/scenepacks.css" layer(base);
 
 /* The app's look — token redefinitions + targeted overrides on top of base. */
 @import "./styles/theme.css" layer(theme);

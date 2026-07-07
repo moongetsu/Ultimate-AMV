@@ -32,6 +32,7 @@ import type { DownloaderTab } from "../types/download";
 import { NewAudioExtractionPanel } from "../features/audio/NewAudioExtractionPanel";
 import { MediaToAudioPanel } from "../features/audio/MediaToAudioPanel";
 import { ClipExtractorPanel } from "../features/clips/ClipExtractorPanel";
+import { ScenePacksPanel } from "../features/scenepacks/ScenePacksPanel";
 import { DownloaderPanel } from "../features/downloader/DownloaderPanel";
 import { LogsPanel } from "../features/logs/LogsPanel";
 import { BackgroundCustomizer } from "../features/settings/BackgroundCustomizer";
@@ -106,6 +107,7 @@ const RAIL_ENTRIES: RailEntry[] = (() => {
     [
       { id: "audio-extraction", label: "Vocal Separation", Icon: AudioLines },
       { id: "clip-hunting", label: "Scene Splitter", Icon: Clapperboard },
+      { id: "scene-packs", label: "ScenePacks", Icon: FolderKanban },
       { id: "bg-removal", label: "BG Remover", Icon: Sparkles },
       { id: "audio-conversion", label: "Audio Conversion", Icon: Music2 },
       { id: "video-conversion", label: "Video Conversion", Icon: Film },
@@ -169,6 +171,11 @@ const panelMeta: Record<SectionId, { kicker: string; title: string; stats: strin
     kicker: "Splitter",
     title: "Scene Splitter",
     stats: ["Scene ranges", "Preview", "Export"],
+  },
+  "scene-packs": {
+    kicker: "Packs",
+    title: "ScenePacks",
+    stats: ["Collections", "Clips", "Export"],
   },
   downloader: {
     kicker: "Download",
@@ -270,6 +277,7 @@ export function App() {
   const isHome = active === "home";
   const isAudioExtraction = active === "audio-extraction";
   const isClipHunting = active === "clip-hunting";
+  const isScenePacks = active === "scene-packs";
   const isDownloader = active === "downloader";
   const isTsukyio = active === "tsukyio";
   const isAudioConversion = active === "audio-conversion";
@@ -357,6 +365,8 @@ export function App() {
             ] as const)
             : isClipHunting
               ? ([{ id: "extractor", label: "Scene splitter" }] as const)
+              : isScenePacks
+                ? ([{ id: "packs", label: "ScenePacks" }] as const)
               : isTsukyio
                 ? ([{ id: "vault", label: "Vault" }] as const)
                 : isAudioConversion || isVideoConversion
@@ -499,7 +509,7 @@ export function App() {
           <div className="sidebar-group">
             <button
               type="button"
-              className={`sidebar-group-header ${["audio-extraction", "clip-hunting", "bg-removal", "audio-conversion", "video-conversion"].includes(active) ? "is-active" : ""}`}
+              className={`sidebar-group-header ${["audio-extraction", "clip-hunting", "scene-packs", "bg-removal", "audio-conversion", "video-conversion"].includes(active) ? "is-active" : ""}`}
               onClick={() => setOpenGroups((g) => ({ ...g, media: !g.media }))}
             >
               <Layers size={18} strokeWidth={2} />
@@ -523,6 +533,14 @@ export function App() {
                 >
                   <Clapperboard size={14} />
                   <span>Scene Splitter</span>
+                </button>
+                <button
+                  type="button"
+                  className={`sidebar-subitem ${active === "scene-packs" ? "is-active" : ""}`}
+                  onClick={() => setActive("scene-packs")}
+                >
+                  <FolderKanban size={14} />
+                  <span>ScenePacks</span>
                 </button>
                 <button
                   type="button"
@@ -714,6 +732,7 @@ export function App() {
                 {!isClipHunting && !isDownloader && !isAudioExtraction && !isBgRemoval && !isTsukyio && (
                   <div className="panel-view is-active spring-motion">
                     {isHome ? <HomePanel onNavigate={handleHomeNavigate} />
+                      : isScenePacks ? <ScenePacksPanel />
                       : isAudioConversion ? <MediaToAudioPanel />
                       : isVideoConversion ? <VideoToVideoPanel />
                         : isLogs ? <LogsPanel />

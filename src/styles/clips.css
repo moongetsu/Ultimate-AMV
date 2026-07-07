@@ -121,6 +121,87 @@
   font-weight: 740;
 }
 
+/* Per-source list inside the source card */
+.clip-source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 148px;
+  overflow-y: auto;
+}
+
+.clip-source-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+}
+
+.clip-source-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary, #e7eef4);
+  font-family: "JetBrains Mono", "Cascadia Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+}
+
+.clip-source-item-count {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--cyan);
+  font-weight: 600;
+}
+
+.clip-source-item-pending {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.clip-source-item-remove {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary, #8b96a1);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.clip-source-item-remove:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.clip-source-clear-all {
+  margin-top: 4px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--text-secondary, #8b96a1);
+  font-size: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s;
+}
+
+.clip-source-clear-all:hover {
+  color: #ef4444;
+}
+
 .clip-tool-stack {
   min-width: 0;
   display: grid;

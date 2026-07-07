@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Clapperboard, Film, Info, Loader2, Scissors, Upload, X, Zap } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Clapperboard, Film, FolderKanban, Info, Loader2, Scissors, Upload, X, Zap } from "lucide-react";
 import { Dropdown } from "../../components/Dropdown";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import {
@@ -57,6 +57,7 @@ import type { ClipExportRow, ClipExportSession } from "./ClipExportProgressModal
 import { ClipPreviewScroller } from "./ClipPreviewScroller";
 import { ClipPreviewTile, offsetMarginWindow } from "./ClipPreviewTile";
 import { SceneViewerModal } from "./SceneViewerModal";
+import { ScenePackSaveModal } from "../scenepacks/ScenePacksPanel";
 
 // Currently dead code : see FINDINGS.md. Moved here unchanged during the
 // main.tsx split to keep that work move-only.
@@ -294,7 +295,13 @@ export function computeGeometryMountVideoIds(params: {
 
 export function ClipExtractorPanel({ active }: { active: boolean }) {
   const [selectedVideos, setSelectedVideos] = React.useState<string[]>([]);
+  const [extractedSources, setExtractedSources] = React.useState<Map<string, ClipExtractionResult>>(() => new Map());
   const [clipMode, setClipMode] = React.useState<"cpu" | "gpu">("gpu");
+  const result = React.useMemo<ClipExtractionResult | null>(() => {
+    const values = Array.from(extractedSources.values());
+    if (values.length === 0) return null;
+    return combineClipResults(values, clipMode);
+  }, [extractedSources, clipMode]);
   const [gridPreview, setGridPreview] = React.useState(true);
   const [hoverPlayOnly, setHoverPlayOnly] = React.useState<boolean>(false);
 
@@ -309,6 +316,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   const [mergeMode, setMergeMode] = React.useState(false);
   const [mergeOrder, setMergeOrder] = React.useState<string[]>([]);
   const [selectedClipIds, setSelectedClipIds] = React.useState<Set<string>>(() => new Set());
+  const [showScenePackModal, setShowScenePackModal] = React.useState(false);
   const [exportFormat, setExportFormat] = React.useState<ClipExportFormat>("prores-lt");
   const [exportQuality, setExportQuality] = React.useState<Record<ClipExportFormat, number>>({
     "gpu-intra": 16,
@@ -344,7 +352,6 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   // re-trigger the effect and the first measurement could be missed.
   const [scrollerEl, setScrollerEl] = React.useState<HTMLElement | null>(null);
   const [progress, setProgress] = React.useState<ClipProgress | null>(null);
-  const [result, setResult] = React.useState<ClipExtractionResult | null>(null);
   const [previewStates, setPreviewStates] = React.useState<Record<string, ClipPreviewState>>({});
   const [error, setError] = React.useState<string | null>(null);
   const [isExtracting, setIsExtracting] = React.useState(false);
@@ -682,7 +689,7 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
      * (concurrent with detection in startExtraction). Resetting here would wipe
      * the in-flight proxy (or its proxyInFlightRef marker) the moment results
      * arrive, leaving tiles stuck. The plan/proxy reset now happens ONCE at
-     * extraction start (startExtraction) and on new source selection (acceptVideos). */
+     * extraction start (startExtraction) and on new source selection (addVideos). */
   }, [result?.input]);
 
   /* DEV TOOLS: listen for proxy-build progress so a finished proxy flips its
@@ -711,24 +718,59 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     };
   }, []);
 
-  function acceptVideos(paths: string[]) {
+  function addVideos(paths: string[]) {
     if (paths.length === 0) return;
-    setSelectedVideos(paths);
-    setSelectedClipIds(new Set());
-    setMergeOrder([]);
-    setResult(null);
-    setPreviewStates({});
-    setProgress(null);
+    setSelectedVideos((prev) => {
+      const existing = new Set(prev);
+      const added = paths.filter((p) => !existing.has(p));
+      if (added.length === 0) return prev;
+      return [...prev, ...added];
+    });
     setError(null);
-    setMergeMode(false);
     setCompatModal(null);
     setConvertedSources({});
+    // Reset per-source playback state for the new sources only
+    for (const s of new Set([...proxyInFlightRef.current, ...planInFlightRef.current])) bumpSourceEpoch(s);
+    planInFlightRef.current.clear();
+    proxyInFlightRef.current.clear();
+    failedProxiesRef.current.clear();
+    forceProxyRebuildRef.current.clear();
+
+    if (clipMode !== "cpu") {
+      void invoke("warmup_clip_server").catch(() => {});
+    }
+  }
+
+  function removeSource(path: string) {
+    setSelectedVideos((prev) => prev.filter((v) => v !== path));
+    setExtractedSources((prev) => {
+      const next = new Map(prev);
+      next.delete(path);
+      return next;
+    });
+    setPreviewStates((prev) => {
+      const next = { ...prev };
+      const sourceName = fileStem(path);
+      for (const key of Object.keys(next)) {
+        if (key.startsWith(sourceName)) delete next[key];
+      }
+      return next;
+    });
+  }
+
+  function clearAllSources() {
+    setSelectedVideos([]);
+    setExtractedSources(new Map());
+    setPreviewStates({});
+    setSelectedClipIds(new Set());
+    setMergeOrder([]);
+    setMergeMode(false);
     setActiveGridItems(null);
     setUnifiedPreviews({});
-    /* DEV TOOLS: a brand-new source selection invalidates any prior per-source
-     * plan/proxy/progress/failure state so the graceful-poster decision (and the
-     * concurrent proxy build) starts clean. The result effect no longer resets
-     * these, so a new source must clear them here. */
+    setProgress(null);
+    setError(null);
+    setCompatModal(null);
+    setConvertedSources({});
     setPlaybackPlans({});
     setSourceProxyPaths({});
     setProxyProgress({});
@@ -737,11 +779,6 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     proxyInFlightRef.current.clear();
     failedProxiesRef.current.clear();
     forceProxyRebuildRef.current.clear();
-
-    // Video picked, high intent to extract - warm up the server
-    if (clipMode !== "cpu") {
-      void invoke("warmup_clip_server").catch(() => {});
-    }
   }
 
   async function pickVideo() {
@@ -755,13 +792,13 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
         },
       ],
     });
-    acceptVideos(normalizeSelectedPaths(selected));
+    addVideos(normalizeSelectedPaths(selected));
   }
 
   const dropZone = useFileDrop({
     accept: clipInputAccept,
     enabled: !isExtracting,
-    onDrop: acceptVideos,
+    onDrop: addVideos,
   });
 
   const selectedVideo = selectedVideos[0] ?? null;
@@ -1533,40 +1570,54 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
   }, [activeGridClipIds, clipMode, clips, gridPreview, hasClips, previewStates, featherweightActive]);
 
   async function startExtraction(overrideVideos?: string[], options?: { force?: boolean; proxies?: Record<string, string> }) {
-    const videos = overrideVideos ?? selectedVideos;
-    if (videos.length === 0 || isExtracting) return;
+    const requestedVideos = overrideVideos ?? selectedVideos;
+    if (requestedVideos.length === 0 || isExtracting) return;
     const force = options?.force ?? false;
     const proxies = options?.proxies ?? detectorProxies;
 
-    // "Extract again" (force) must be a COMPLETE redo: scene detection already
-    // bypasses its cache via the force flag below, but the source proxy has its
-    // own on-disk cache. Mark each re-extracted source so its next proxy build
-    // rebuilds instead of cache-hitting a stale/buggy file. Consumed one-shot in
-    // the lazy proxy-build effect. Without this, no proxy fix is ever testable.
+    // Filter: only extract videos not already in extractedSources, unless force
+    const videos = force
+      ? requestedVideos
+      : requestedVideos.filter((v) => !extractedSources.has(v));
+
+    if (videos.length === 0) {
+      setProgress({
+        type: "progress",
+        stage: "complete",
+        percent: 100,
+        message: `All ${requestedVideos.length} episode${requestedVideos.length !== 1 ? "s" : ""} already extracted. Use Extract again to re-detect.`,
+        elapsedSeconds: 0,
+      });
+      return;
+    }
+
     if (force) {
       for (const video of videos) forceProxyRebuildRef.current.add(video);
     }
 
-    // Reset per-source plan/proxy state ONCE here at extraction start (it used to
-    // live in the result?.input effect). Doing it here — before the concurrent
-    // proxy build is kicked below — means detection's results landing mid-extraction
-    // won't wipe the in-flight proxy or its proxyInFlightRef marker. failedProxiesRef
-    // is cleared too so a prior terminal failure doesn't poison the new build.
-    setPlaybackPlans({});
-    setSourceProxyPaths({});
-    setProxyProgress({});
+    // Reset per-source plan/proxy state for new sources only
+    const existingSourcePlans = { ...playbackPlans };
+    const existingSourceProxies = { ...sourceProxyPaths };
+    for (const video of videos) {
+      delete existingSourcePlans[video];
+      delete existingSourceProxies[video];
+    }
+    setPlaybackPlans(existingSourcePlans);
+    setSourceProxyPaths(existingSourceProxies);
     for (const s of new Set([...proxyInFlightRef.current, ...planInFlightRef.current])) bumpSourceEpoch(s);
     planInFlightRef.current.clear();
     proxyInFlightRef.current.clear();
     failedProxiesRef.current.clear();
 
-    // GPU mode no longer blocks on a codec preflight. The Python backend
-    // routes any codec NVDEC/nelux can't decode straight to software decode ->
-    // the same TransNetV2 model (mode stays "gpu"), so detection quality is
-    // unchanged and we avoid both the lossy forced-convert AND the nelux
-    // native-hang risk on unsupported codecs. We still probe here purely to
-    // surface a heads-up log line when the slower software-decode route will
-    // kick in; we do NOT pop the convert modal or abort.
+    if (force) {
+      // Full re-extract: clear existing results for requested videos
+      setExtractedSources((prev) => {
+        const next = new Map(prev);
+        for (const v of requestedVideos) next.delete(v);
+        return next;
+      });
+    }
+
     if (clipMode === "gpu") {
       const unsupported = await findFirstUnsupportedGpuCodec(videos);
       if (unsupported) {
@@ -1580,18 +1631,11 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
     }
 
     setIsExtracting(true);
-    setResult(null);
-    setPreviewStates({});
     previewTokenRef.current += 1;
     previewInFlightRef.current.clear();
     previewBatchInFlightRef.current = 0;
     setError(null);
     setCompatModal(null);
-    setSelectedClipIds(new Set());
-    setMergeOrder([]);
-    setMergeMode(false);
-    setActiveGridItems(null);
-    setUnifiedPreviews({});
     setProgress({
       type: "progress",
       stage: "starting",
@@ -1600,6 +1644,9 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
         ? `Starting ${videos.length} episode batch...`
         : clipMode === "gpu" ? "Starting GPU scene detection..." : "Starting CPU scene detection...",
     });
+
+    const totalSources = requestedVideos.length;
+    const alreadyDone = totalSources - videos.length;
 
     try {
       if (clipMode === "gpu") {
@@ -1618,21 +1665,16 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
         });
       }
 
-      // Overlap: start the source-proxy build(s) concurrently with detection. The proxy
-      // (NVDEC+NVENC) and TransNet detection (tensor cores) mostly use different GPU
-      // silicon; they only share the decoder. Fire-and-forget — do NOT await — so the
-      // ~23s proxy overlaps the ~21s detection instead of running after it. force is
-      // honored via forceProxyRebuildRef (set above on "extract again").
       if (featherweightActive) {
         for (const video of videos) kickProxyBuild(video);
       }
 
-      const results: ClipExtractionResult[] = [];
+      let completedCreated = alreadyDone;
+      const newResults = new Map<string, ClipExtractionResult>(extractedSources);
+
       for (let index = 0; index < videos.length; index += 1) {
         if (clipCancellingRef.current) break;
         const rawPath = videos[index];
-        // Feed the detector the proxy if one exists for this raw (manual
-        // last-resort convert), but everything user-facing stays on the raw.
         const detectInput = proxies[rawPath] ?? rawPath;
         const inputPath = detectInput;
         clipBatchProgressRef.current = {
@@ -1643,15 +1685,10 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
         setProgress({
           type: "progress",
           stage: "starting",
-          percent: Math.round((index / videos.length) * 100),
-          message: `Episode ${index + 1}/${videos.length}: ${fileName(rawPath)}`,
+          percent: Math.round((completedCreated / totalSources) * 100),
+          message: `Episode ${completedCreated + 1}/${totalSources}: ${fileName(rawPath)}`,
         });
         const raw = await invoke<string>("clip_extract", { inputPath, mode: clipMode, force });
-        // Strict type check rather than substring — the cached "done" payload
-        // returned for a cache hit is the same shape as a real done event and
-        // could theoretically contain the literal string in a path, scene
-        // label, or error field. Substring matching would route those to the
-        // server-wait branch and the frontend would hang forever.
         let isServerTask = false;
         try {
           const peek = JSON.parse(raw) as { type?: string } | null;
@@ -1662,10 +1699,6 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
         const rawPayload = isServerTask
           ? await waitForClipServerResult(clipAbortRef)
           : parseBridgePayload<ClipExtractionResult>(raw);
-        // If detection ran on a proxy, rewrite every scene's source (and the
-        // top-level input) back to the RAW so preview + export read the
-        // original file, never the lossy proxy. Timecodes are unchanged
-        // because the proxy is a straight full transcode of the raw.
         const payload: ClipExtractionResult = detectInput !== rawPath
           ? {
               ...rawPayload,
@@ -1673,26 +1706,27 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
               scenes: rawPayload.scenes.map((scene) => ({ ...scene, source: rawPath })),
             }
           : rawPayload;
-        results.push(payload);
-        setResult(combineClipResults(results, clipMode));
+        newResults.set(rawPath, payload);
+        setExtractedSources(new Map(newResults));
+        completedCreated += 1;
         setProgress({
           type: "progress",
           stage: "complete",
-          percent: Math.round(((index + 1) / videos.length) * 100),
-          message: `Episode ${index + 1}/${videos.length} complete: ${fileName(rawPath)}`,
-          elapsedSeconds: results.reduce((total, item) => total + (item.totalSeconds || 0), 0),
+          percent: Math.round((completedCreated / totalSources) * 100),
+          message: `Episode ${completedCreated}/${totalSources} complete: ${fileName(rawPath)}`,
+          elapsedSeconds: Array.from(newResults.values()).reduce((total, item) => total + (item.totalSeconds || 0), 0),
         });
       }
 
-      if (results.length === 0) return;
-      const payload = combineClipResults(results, clipMode);
-      setResult(payload);
+      const allResults = Array.from(newResults.values());
+      if (allResults.length === 0) return;
+      const combined = combineClipResults(allResults, clipMode);
       setProgress({
         type: "progress",
         stage: "complete",
         percent: 100,
-        message: `Detected ${payload.sceneCount} scenes in ${formatDuration(payload.totalSeconds)} with ${clipMode.toUpperCase()}`,
-        elapsedSeconds: payload.totalSeconds,
+        message: `Detected ${combined.sceneCount} scenes in ${formatDuration(combined.totalSeconds)} with ${clipMode.toUpperCase()}`,
+        elapsedSeconds: combined.totalSeconds,
       });
     } catch (clipError) {
       if (!clipCancellingRef.current) {
@@ -2531,14 +2565,14 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
           <span className="clip-import-mark">
             <Scissors size={32} strokeWidth={1.9} />
           </span>
-          <span>{selectedVideos.length > 0 ? "Change episodes" : "Select episodes"}</span>
+          <span>{selectedVideos.length > 0 ? "Add episodes" : "Select episodes"}</span>
         </button>
 
         <div className="clip-source-card glass">
           <div className="clip-source-header">
             <div className="clip-source-info">
-              <small>Source</small>
-              <strong>{displayName}</strong>
+              <small>Sources</small>
+              <strong>{selectedVideos.length} episode{selectedVideos.length !== 1 ? "s" : ""}</strong>
             </div>
           <div
             className={`clip-server-badge spring-motion ${serverStatus === "ready" ? "is-ready" : serverStatus === "warming" ? "is-warming" : ""}`}
@@ -2548,9 +2582,43 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
           </div>
           </div>
           {selectedVideos.length > 0 && (
-            <span>{selectedVideos.length === 1 ? selectedVideos[0] : selectedVideos.map(fileName).join(" / ")}</span>
+            <div className="clip-source-list">
+              {selectedVideos.map((v) => {
+                const sourceResult = extractedSources.get(v);
+                const clipCount = sourceResult?.scenes.length;
+                return (
+                  <div key={v} className="clip-source-item">
+                    <span className="clip-source-item-name" title={v}>{fileName(v)}</span>
+                    {clipCount !== undefined ? (
+                      <span className="clip-source-item-count">{clipCount} clips</span>
+                    ) : (
+                      <span className="clip-source-item-pending">Not extracted</span>
+                    )}
+                    <button
+                      type="button"
+                      className="clip-source-item-remove"
+                      onClick={() => removeSource(v)}
+                      title="Remove source"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                );
+              })}
+              {selectedVideos.length > 1 && (
+                <button
+                  type="button"
+                  className="clip-source-clear-all"
+                  onClick={clearAllSources}
+                >
+                  Clear all sources
+                </button>
+              )}
+            </div>
           )}
-          <em>{clipMode === "gpu" ? "GPU mode · RTX TransNetV2" : "CPU mode · PySceneDetect"}</em>
+          {selectedVideos.length === 0 && (
+            <em>{clipMode === "gpu" ? "GPU mode · RTX TransNetV2" : "CPU mode · PySceneDetect"}</em>
+          )}
           {convertedBadgeNames.length > 0 && (
             <span className="clip-compat-badge" title="Scene detection runs on a converted copy in the app's cache, but previews and exports still read your original file. The original is untouched.">
               {convertedBadgeNames.length === 1
@@ -2659,6 +2727,16 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
               >
                 <CheckCircle2 size={18} strokeWidth={2} />
                 <span>{hasClips && selectedCount === displayedClips.length ? "Clear selection" : "Select all clips"}</span>
+              </button>
+
+              <button
+                type="button"
+                className={`clip-tool-button spring-motion ${selectedCount > 0 ? "is-active-primary" : ""}`}
+                disabled={selectedCount === 0 || isExtracting}
+                onClick={() => setShowScenePackModal(true)}
+              >
+                <FolderKanban size={18} strokeWidth={2} />
+                <span>{selectedCount === 0 ? "Select clips to save" : `Save to ScenePack (${selectedCount})`}</span>
               </button>
             </>
           )}
@@ -2987,6 +3065,25 @@ export function ClipExtractorPanel({ active }: { active: boolean }) {
         />
 
         <SceneViewerModal clip={viewerClip} onClose={closeViewer} />
+
+        {showScenePackModal && (
+          <ScenePackSaveModal
+            clips={displayedClips
+              .filter((c) => selectedClipIds.has(c.id))
+              .map((c) => ({
+                id: c.id,
+                index: c.index,
+                label: c.label,
+                sourceName: c.sourceName,
+                sourceSrc: c.path ?? c.sourceSrc,
+                sourceStart: c.sourceStart,
+                sourceEnd: c.sourceEnd,
+                fps: c.fps,
+              }))}
+            sourceName={selectedVideos.length > 0 ? fileStem(selectedVideos[0]) : ""}
+            onClose={() => setShowScenePackModal(false)}
+          />
+        )}
 
         <ClipExportProgressModal
           session={exportSession}

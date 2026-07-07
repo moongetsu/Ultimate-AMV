@@ -1,6 +1,7 @@
 export type SectionId =
   | "home"
   | "clip-hunting"
+  | "scene-packs"
   | "downloader"
   | "tsukyio"
   | "audio-extraction"

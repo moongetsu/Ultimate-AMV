@@ -138,3 +138,37 @@ export type ClipExportFormat =
   | "h264-cpu"
   | "hevc-cpu"
   | "lossless-cut";
+
+export type ScenePackClip = {
+  id: string;
+  index: number;
+  label: string;
+  sourceName: string;
+  sourceSrc: string;
+  sourceStart: number;
+  sourceEnd: number;
+  fps: number;
+};
+
+export type ScenePack = {
+  id: string;
+  name: string;
+  animeTitle: string;
+  character: string;
+  sourceName: string;
+  sourceSrc: string;
+  createdAt: string;
+  updatedAt: string;
+  clips: ScenePackClip[];
+};
+
+export type ScenePackMeta = {
+  id: string;
+  name: string;
+  animeTitle: string;
+  character: string;
+  sourceName: string;
+  clipCount: number;
+  createdAt: string;
+  updatedAt: string;
+};

@@ -12,6 +12,7 @@ mod config;
 mod discord;
 mod downloads;
 mod eyedropper;
+mod scene_packs;
 mod logging;
 mod preview;
 mod python_env;
@@ -467,7 +468,12 @@ pub fn run() {
             discord_set_state,
             discord_clear,
             eyedropper::sample_screen_color,
-            write_file
+            write_file,
+            scene_packs::scene_packs_list,
+            scene_packs::scene_packs_load,
+            scene_packs::scene_packs_save,
+            scene_packs::scene_packs_delete,
+            scene_packs::scene_packs_fingerprint,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

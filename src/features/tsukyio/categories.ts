@@ -15,7 +15,6 @@ export const CATEGORIES: { id: string; label: string }[] = [
   { id: "remake_clips", label: "Remake" },
   { id: "green_screen", label: "Green Screen" },
   { id: "edit_audios", label: "Edit Audios" },
-  { id: "credits", label: "Credits" },
 ];
 
 // The real vault categories (excludes the "all" UI pseudo-category), in
@@ -53,7 +52,6 @@ const DISPLAY_TO_ID: Record<string, string> = {
   "edit audios": "edit_audios",
   "edit audio": "edit_audios",
   edit_audios: "edit_audios",
-  credits: "credits",
 };
 
 export function categoryIdFromDisplay(display: string | undefined): string | null {
@@ -91,5 +89,4 @@ export const CATEGORY_ACCENTS: Record<string, string> = {
   remake_clips: "accent-remake",
   green_screen: "accent-green",
   edit_audios: "accent-editaudios",
-  credits: "accent-credits",
 };

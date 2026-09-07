@@ -27,7 +27,6 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   Sparkles,
-  Type,
   User,
   Volume2,
   Wand2,
@@ -131,7 +130,6 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ size?: number; stroke
   sfx: Volume2,
   remake_clips: Wand2,
   green_screen: ImageIcon,
-  credits: Type,
   edit_audios: Music2,
 };
 

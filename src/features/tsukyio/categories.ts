@@ -14,10 +14,11 @@ export const CATEGORIES: { id: string; label: string }[] = [
   { id: "sfx", label: "SFX" },
   { id: "remake_clips", label: "Remake" },
   { id: "green_screen", label: "Green Screen" },
+  { id: "edit_audios", label: "Edit Audios" },
   { id: "credits", label: "Credits" },
 ];
 
-// The 9 real vault categories (excludes the "all" UI pseudo-category), in
+// The real vault categories (excludes the "all" UI pseudo-category), in
 // canonical display order. Used to drive the discovery home tiles and the
 // per-category parallel search fan-out.
 export const REAL_CATEGORIES = CATEGORIES.filter((c) => c.id !== "all");
@@ -49,6 +50,9 @@ const DISPLAY_TO_ID: Record<string, string> = {
   "remake clips": "remake_clips",
   remake: "remake_clips",
   "green screen": "green_screen",
+  "edit audios": "edit_audios",
+  "edit audio": "edit_audios",
+  edit_audios: "edit_audios",
   credits: "credits",
 };
 
@@ -61,7 +65,7 @@ export function categoryIdFromDisplay(display: string | undefined): string | nul
   return DISPLAY_TO_ID[key] ?? null;
 }
 
-// True when an item's `category` belongs to one of the 9 real vault categories.
+// True when an item's `category` belongs to one of the real vault categories.
 // The vault also serves a legacy/orphaned "Audio" duplicate tree: every file in
 // it is a dead twin of a live Vocals file and 404s on BOTH stream and download.
 // Those items carry a category ("Audio") that maps to no real id, so callers
@@ -86,5 +90,6 @@ export const CATEGORY_ACCENTS: Record<string, string> = {
   sfx: "accent-sfx",
   remake_clips: "accent-remake",
   green_screen: "accent-green",
+  edit_audios: "accent-editaudios",
   credits: "accent-credits",
 };

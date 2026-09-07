@@ -132,6 +132,7 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ size?: number; stroke
   remake_clips: Wand2,
   green_screen: ImageIcon,
   credits: Type,
+  edit_audios: Music2,
 };
 
 // Public origin that actually serves the vault's static files (thumbnails).

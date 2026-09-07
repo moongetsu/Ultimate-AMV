@@ -51,6 +51,7 @@ import {
   CATEGORIES,
   CATEGORY_ACCENTS,
   REAL_CATEGORIES,
+  categoryCountLabel,
   categoryIdFromDisplay,
   categoryLabel,
   isRealCategory,
@@ -1384,7 +1385,9 @@ function DiscoveryHome({
               </span>
               <span className="tsukyio-tile-name">{cat.label}</span>
               <span className="tsukyio-tile-count">
-                {typeof count === "number" ? `${formatCount(count)} clips` : "Browse"}
+                {typeof count === "number"
+                  ? `${formatCount(count)} ${categoryCountLabel(cat.id)}`
+                  : "Browse"}
               </span>
             </button>
           );

@@ -90,3 +90,22 @@ export const CATEGORY_ACCENTS: Record<string, string> = {
   green_screen: "accent-green",
   edit_audios: "accent-editaudios",
 };
+
+// Custom noun phrases to append after counts on the discovery home tiles (e.g. "1,234 Raw Clips", "56 Vocals").
+export const CATEGORY_COUNT_LABELS: Record<string, string> = {
+  precuts: "Precuts",
+  raw: "Raw Clips",
+  flow: "Flow Clips",
+  vocals: "Vocals",
+  overlays: "Overlays",
+  sfx: "SFX",
+  remake_clips: "Remake Clips",
+  green_screen: "Green Screen Clips",
+  edit_audios: "Edit Audios",
+};
+
+export function categoryCountLabel(id: string | undefined): string {
+  if (!id) return "clips";
+  return CATEGORY_COUNT_LABELS[id] ?? "clips";
+}
+
